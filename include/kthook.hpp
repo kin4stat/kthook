@@ -1,12 +1,36 @@
-#ifndef KTHOOK_HPP
-#define KTHOOK_HPP
+#ifndef KTHOOK_HPP_
+#define KTHOOK_HPP_
+
+#if defined(_WIN64) || defined(__MINGW64__) || (defined(__CYGWIN__) && defined(__x86_64__))
+#define KTHOOK_64_WIN
+#elif defined(__x86_64__)
+#define KTHOOK_64_GCC
+#endif
+#if !defined(KTHOOK_64) && !defined(KTHOOK_32)
+#if defined(KTHOOK_64_GCC) || defined(KTHOOK_64_WIN)
+#define KTHOOK_64
+#else
+#define KTHOOK_32
+#endif
+#endif
+
+#ifdef KTHOOK_64
+#error x64 support WIP
+#endif
+
+#include "kthook_traits.hpp"
+#include "kthook_detail.hpp"
 #include "xbyak/xbyak.h"
 #include "ktsignal.hpp"
 #include <memory>
 #include <type_traits>
 #include <cstdint>
 #include <cstddef>
+#include <cstring>
 #ifdef _WIN32
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
 #include <windows.h>
 #else
 #include <sys/mman.h>
@@ -14,7 +38,8 @@
 #endif
 
 namespace kthook {
-#ifdef XBYAK64
+
+#ifdef KTHOOK_64
 #include "./hde/hde64.h"
     using hde = hde64s;
 #define hde_disasm(code, hs) hde64_disasm(code, hs)
@@ -26,7 +51,7 @@ namespace kthook {
 
     // from https://github.com/TsudaKageyu/minhook/blob/master/src/trampoline.h
 #pragma pack(push, 1)
-#ifdef XBYAK64
+#ifdef KTHOOK_64
     struct JCC_ABS
     {
         std::uint8_t  opcode;      // 7* 0E:         J** +16
@@ -69,7 +94,6 @@ namespace kthook {
     };
 #endif
 #pragma pack(pop)
-
     namespace detail {
         std::size_t detect_hook_size(std::uintptr_t addr) {
             size_t size = 0;
@@ -108,9 +132,7 @@ namespace kthook {
             PROTECT_RWE,
             PROTECT_RE,
         };
-
-        bool set_memory_prot(const void* addr, std::size_t size, MemoryProt protectMode)
-        {
+        bool set_memory_prot(const void* addr, std::size_t size, MemoryProt protectMode) {
 #if defined(_WIN32)
             const DWORD c_rw = PAGE_READWRITE;
             const DWORD c_rwe = PAGE_EXECUTE_READWRITE;
@@ -143,218 +165,19 @@ namespace kthook {
         }
     }
 
-    enum class cconv {
-        ccdecl,
-        cfastcall,
-        cthiscall,
-        cstdcall,
-    };
-
-    namespace func_type_traits
-    {
-        template <typename>
-        struct function_convention {};
-        template <typename Ret, typename... Args>
-        struct function_convention<Ret(__stdcall*) (Args...)>
-        {
-            static constexpr cconv value = cconv::cstdcall;
-        };
-        template <typename Ret, typename... Args>
-        struct function_convention<Ret(__cdecl*) (Args...)>
-        {
-            static constexpr cconv value = cconv::ccdecl;
-        };
-        template <typename Ret, typename Class, typename... Args>
-        struct function_convention<Ret(Class::*)(Args...)>
-        {
-            static constexpr cconv value = cconv::cthiscall;
-        };
-        template <typename Ret, typename... Args>
-        struct function_convention<Ret(__fastcall*) (Args...)>
-        {
-            static constexpr cconv value = cconv::cfastcall;
-        };
-        template <typename Ret, typename... Args>
-        struct function_convention<Ret(__thiscall*) (Args...)>
-        {
-            static constexpr cconv value = cconv::cthiscall;
-        };
-        template <typename Func>
-        constexpr cconv function_convention_v = function_convention<Func>::value;
-    };
-
-#ifdef XBYAK32
-#ifdef __GNUC__
-#define CCDECL __attribute__((cdecl))
-#define CFASTCALL __attribute__((fastcall))
-#define CSTDCALL __attribute__((stdcall))
-#define CTHISCALL __attribute__((thiscall))
-#else
-#define CCDECL __cdecl
-#define CFASTCALL __fastcall
-#define CSTDCALL __stdcall
-#define CTHISCALL __thiscall
+    template <hook_type_traits::cconv Convention, typename Ret, typename... Args>
+    class kthook_internal_impl {
+#ifdef KTHOOK_32
+        hook_type_traits::cconv hook_convention;
 #endif
-
-    template <typename HookType, cconv Convention, typename Ret, typename... Args>
-    struct relay_generator;
-
-    template <typename HookType, typename Ret, typename... Args>
-    struct relay_generator<HookType, cconv::cstdcall, Ret, Args...> {
-        static Ret CSTDCALL relay(HookType* this_hook, Args... args) {
-            using SourceType = Ret(CSTDCALL*)(Args...);
-
-            auto before_iterate = this_hook->onBefore.emit_iterate(args...);
-            bool dont_skip_original = true;
-            for (bool return_value : before_iterate) {
-                dont_skip_original &= return_value;
-            }
-            if (dont_skip_original) {
-                if constexpr (std::is_void_v<Ret>) {
-                    reinterpret_cast<SourceType>(this_hook->trampoline)(args...);
-                    this_hook->onAfter.emit(args...);
-                    return;
-                }
-                else {
-                    Ret return_value{ std::move(this_hook->trampoline(args...)) };
-                    this_hook->onAfter.emit(&return_value, args...);
-                    return return_value;
-                }
-            }
-            if constexpr (!std::is_void_v<Ret>)
-                return Ret{};
-        }
-    };
-
-    template <typename HookType, typename Ret, typename... Args>
-    struct relay_generator<HookType, cconv::cthiscall, Ret, Args...> {
-        static Ret CSTDCALL relay(HookType* this_hook, Args... args) {
-            using SourceType = Ret(CTHISCALL*)(Args...);
-
-            auto before_iterate = this_hook->onBefore.emit_iterate(args...);
-            bool dont_skip_original = true;
-            for (bool return_value : before_iterate) {
-                dont_skip_original &= return_value;
-            }
-            if (dont_skip_original) {
-                if constexpr (std::is_void_v<Ret>) {
-                    reinterpret_cast<SourceType>(this_hook->trampoline)(args...);
-                    this_hook->onAfter.emit(args...);
-                    return;
-                }
-                else {
-                    Ret return_value{ std::move(this_hook->trampoline(args...)) };
-                    this_hook->onAfter.emit(&return_value, args...);
-                    return return_value;
-                }
-            }
-            if constexpr (!std::is_void_v<Ret>)
-                return Ret{};
-        }
-    };
-
-    template <typename HookType, typename Ret, typename... Args>
-    struct relay_generator<HookType, cconv::cfastcall, Ret, Args...> {
-
-        // fastcall uses registers for first two integral/pointer types (left->right)
-        // so we can use this trick to get outr hook object from stack
-        struct fastcall_trick {
-            HookType* ptr;
-        };
-
-        static Ret CFASTCALL relay(fastcall_trick esp4, Args... args) {
-            using SourceType = Ret(CFASTCALL*)(Args...);
-
-            HookType* this_hook = esp4.ptr;
-            auto before_iterate = this_hook->onBefore.emit_iterate(args...);
-            bool dont_skip_original = true;
-            for (bool return_value : before_iterate) {
-                dont_skip_original &= return_value;
-            }
-            if (dont_skip_original) {
-                if constexpr (std::is_void_v<Ret>) {
-                    reinterpret_cast<SourceType>(this_hook->trampoline)(args...);
-                    this_hook->onAfter.emit(args...);
-                    return;
-                }
-                else {
-                    Ret return_value{ std::move(this_hook->trampoline(args...)) };
-                    this_hook->onAfter.emit(&return_value, args...);
-                    return return_value;
-                }
-            }
-            if constexpr (!std::is_void_v<Ret>)
-                return Ret{};
-        }
-    };
-
-    template <typename HookType, typename Ret, typename... Args>
-    struct relay_generator<HookType, cconv::ccdecl, Ret, Args...> {
-        static Ret CCDECL relay(HookType* this_hook, std::uintptr_t retaddr, Args... args) {
-            using SourceType = Ret(CCDECL*)(Args...);
-
-            auto before_iterate = this_hook->onBefore.emit_iterate(args...);
-            bool dont_skip_original = true;
-            for (bool return_value : before_iterate) {
-                dont_skip_original &= return_value;
-            }
-            if (dont_skip_original) {
-                if constexpr (std::is_void_v<Ret>) {
-                    reinterpret_cast<SourceType>(this_hook->trampoline)(args...);
-                    this_hook->onAfter.emit(args...);
-                    return;
-                }
-                else {
-                    Ret return_value{ std::move(this_hook->trampoline(args...)) };
-                    this_hook->onAfter.emit(&return_value, args...);
-                    return return_value;
-                }
-            }
-            if constexpr (!std::is_void_v<Ret>)
-                return Ret{};
-        }
-    };
-#endif
-    template <auto* dest, cconv Convention, typename Ret, typename... Args>
-    class kthook_impl {
-        friend struct relay_generator<kthook_impl, Convention, Ret, Args...>;
-        template <typename FuncSig>
-        class hook_signal : public ktsignal::ktsignal_threadsafe<FuncSig> {
-            using ktsignal::ktsignal_threadsafe<FuncSig>::emit;
-            using ktsignal::ktsignal_threadsafe<FuncSig>::emit_iterate;
-            friend struct relay_generator<kthook_impl, Convention, Ret, Args...>;
-        };
-
-        template<class T, class Enable = void>
-        struct on_after_type {
-            using type = hook_signal<void(std::add_lvalue_reference_t<Args>...)>;
-        };
-
-        template<class T>
-        struct on_after_type<T, typename std::enable_if<!std::is_void_v<T>>::type> {
-            using type = hook_signal<void(Ret&, std::add_lvalue_reference_t<Args>...)>;
-        };
-
-        using on_after_type_t = on_after_type<Ret>::type;
     public:
-        hook_signal<bool(std::add_lvalue_reference_t<Args>...)> onBefore;
 
-        on_after_type_t onAfter;
-
-#ifdef XBYAK32
-        kthook_impl(bool force_install = true) {
-            hook_address = reinterpret_cast<std::uintptr_t>(dest);
+        kthook_internal_impl(bool force_install = true) {
             trampoline_gen = std::make_unique<Xbyak::CodeGenerator>();
             jump_gen = std::make_unique<Xbyak::CodeGenerator>();
-            if (force_install)
-                install();
         }
-#else
-        // WIP
-#endif
-
-        ~kthook_impl() {
-
+        ~kthook_internal_impl() {
+            remove();
         }
 
         bool install() {
@@ -368,37 +191,18 @@ namespace kthook {
             if (!patch_hook(true)) return false;
             return true;
         }
-
         bool remove() {
             if (!patch_hook(false)) return false;
             trampoline_gen->reset();
             jump_gen->reset();
             return true;
         }
-        
+    protected:
+        std::uintptr_t hook_address;
+        std::unique_ptr<Xbyak::CodeGenerator> jump_gen;
+        std::uint8_t* trampoline;
+        void* relay;
     private:
-        const std::uint8_t* generate_relay_jump() {
-            using namespace Xbyak::util;
-            if constexpr (Convention != cconv::ccdecl) {
-                jump_gen->pop(eax);
-            }
-            if constexpr (Convention == cconv::cthiscall) {
-                jump_gen->pop(ecx);
-            }
-            jump_gen->push(reinterpret_cast<std::uintptr_t>(this));
-            if constexpr (Convention == cconv::ccdecl) {
-                jump_gen->call(&relay_generator<kthook_impl, Convention, Ret, Args...>::relay);
-                jump_gen->add(esp, 4);
-                jump_gen->ret();
-            }
-            else {
-                jump_gen->push(eax);
-                jump_gen->jmp(&relay_generator<kthook_impl, Convention, Ret, Args...>::relay);
-            }
-            detail::flush_intruction_cache(reinterpret_cast<void*>(const_cast<std::uint8_t*>(jump_gen->getCode())), jump_gen->getSize());
-            return jump_gen->getCode();
-        }
-
         bool patch_hook(bool enable) {
             if (enable) {
                 hook_size = detail::detect_hook_size(hook_address);
@@ -427,7 +231,8 @@ namespace kthook {
             return true;
         }
 
-        bool create_trampoline() {
+        bool create_trampoline()
+        {
             // save original code
 #ifdef XBYAK64
             CALL_ABS call = {
@@ -602,41 +407,279 @@ namespace kthook {
             return true;
         }
 
-        std::uintptr_t hook_address;
+        const std::uint8_t* generate_relay_jump() {
+            using namespace Xbyak::util;
+            if constexpr (Convention != hook_type_traits::cconv::ccdecl) {
+                jump_gen->pop(eax);
+            }
+            if constexpr (Convention == hook_type_traits::cconv::cthiscall) {
+                jump_gen->pop(ecx);
+            }
+            jump_gen->push(reinterpret_cast<std::uintptr_t>(this));
+            if constexpr (Convention == hook_type_traits::cconv::ccdecl) {
+                jump_gen->call(relay);
+                jump_gen->add(esp, 4);
+                jump_gen->ret();
+            }
+            else {
+                jump_gen->push(eax);
+                jump_gen->jmp(relay);
+            }
+            detail::flush_intruction_cache(reinterpret_cast<void*>(const_cast<std::uint8_t*>(this->jump_gen->getCode())), this->jump_gen->getSize());
+            return jump_gen->getCode();
+        }
+
         std::size_t hook_size;
         std::unique_ptr<unsigned char[]> original_code;
         std::unique_ptr<Xbyak::CodeGenerator> trampoline_gen;
-        std::unique_ptr<Xbyak::CodeGenerator> jump_gen;
-        std::uint8_t* trampoline;
-#ifdef XBYAK32
-        cconv hook_convention;
-#endif
     };
 
-    template <auto* f, typename = decltype(f)>
+    enum class kthook_type {
+        simple,
+        medium,
+        complex,
+    };
+
+    template <kthook_type hook_type, hook_type_traits::cconv Convention, typename Ret, typename... Args>
+    class kthook_impl {};
+
+    template <hook_type_traits::cconv Convention, typename Ret, typename... Args>
+    class kthook_impl<kthook_type::simple, Convention, Ret, Args...> : public kthook_internal_impl<Convention, Ret, Args...> {
+        using relay_gen_from_this = detail::relay_simple_generator<kthook_impl, Convention, Ret, Args...>;
+
+        friend relay_gen_from_this;
+        template <typename FuncSig>
+        class hook_signal : public ktsignal::ktsignal_threadsafe<FuncSig> {
+            using ktsignal::ktsignal_threadsafe<FuncSig>::emit;
+            using ktsignal::ktsignal_threadsafe<FuncSig>::emit_iterate;
+            friend relay_gen_from_this;
+        };
+
+        template<class T, class Enable = void>
+        struct on_after_type {
+            using type = hook_signal<void(std::add_lvalue_reference_t<Args>...)>;
+        };
+
+        template<class T>
+        struct on_after_type<T, typename std::enable_if<!std::is_void_v<T>>::type> {
+            using type = hook_signal<void(Ret&, std::add_lvalue_reference_t<Args>...)>;
+        };
+
+        template<class T>
+        struct on_before_type {
+            using type = hook_signal<bool(std::add_lvalue_reference_t<Args>...) >;
+        };
+
+        using on_after_type_t = on_after_type<Ret>::type;
+        using on_before_type_t = on_before_type<Ret>::type;
+        using kthook_internal_impl<Convention, Ret, Args...>::relay;
+        using kthook_internal_impl<Convention, Ret, Args...>::hook_address;
+    public:
+#ifdef _WIN32
+        kthook_impl(void* dest, bool force_install = true) {
+#else
+        kthook_impl(Ret(*dest)(Args...), bool force_install = true) {
+#endif
+            relay = reinterpret_cast<void*>(&relay_gen_from_this::relay);
+            hook_address = reinterpret_cast<std::uintptr_t>(dest);
+            if (force_install)
+                this->install();
+        }
+
+        on_before_type_t before;
+        on_after_type_t after;
+    };
+
+    template <hook_type_traits::cconv Convention, typename Ret, typename... Args>
+    class kthook_impl<kthook_type::medium, Convention, Ret, Args...> : public kthook_internal_impl<Convention, Ret, Args...> {
+        using relay_gen_from_this = detail::relay_generator<detail::generator_type::simple, kthook_impl, Convention, Ret, Args...>;
+
+        friend relay_gen_from_this;
+        template <typename FuncSig>
+        class hook_signal : public ktsignal::ktsignal_threadsafe<FuncSig> {
+            using ktsignal::ktsignal_threadsafe<FuncSig>::emit;
+            using ktsignal::ktsignal_threadsafe<FuncSig>::emit_iterate;
+            friend relay_gen_from_this;
+        };
+
+        template<class T, class Enable = void>
+        struct on_after_type {
+            using type = hook_signal<void(std::add_lvalue_reference_t<Args>...)>;
+        };
+
+        template<class T>
+        struct on_after_type<T, typename std::enable_if<!std::is_void_v<T>>::type> {
+            using type = hook_signal<void(Ret&, std::add_lvalue_reference_t<Args>...)>;
+        };
+
+        template<class T, class Enable = void>
+        struct on_before_type {
+            using type = hook_signal<bool(std::add_lvalue_reference_t<Args>...) >;
+        };
+
+        template<class T>
+        struct on_before_type<T, typename std::enable_if<!std::is_void_v<T>>::type>{
+            using type = hook_signal<detail::return_value<T>(std::add_lvalue_reference_t<Args>...) >;
+        };
+
+        using on_after_type_t = on_after_type<Ret>::type;
+        using on_before_type_t = on_before_type<Ret>::type;
+        using kthook_internal_impl<Convention, Ret, Args...>::relay;
+        using kthook_internal_impl<Convention, Ret, Args...>::hook_address;
+    public:
+#ifdef _WIN32
+        kthook_impl(void* dest, bool force_install = true) {
+#else
+        kthook_impl(Ret(*dest)(Args...), bool force_install = true) {
+#endif
+            relay = reinterpret_cast<void*>(&relay_gen_from_this::relay);
+            hook_address = reinterpret_cast<std::uintptr_t>(dest);
+            if (force_install)
+                this->install();
+        }
+
+        on_before_type_t before;
+        on_after_type_t after;
+    };
+
+    template <hook_type_traits::cconv Convention, typename Ret, typename... Args>
+    class kthook_impl<kthook_type::complex, Convention, Ret, Args...> : public kthook_internal_impl<Convention, Ret, Args...> {
+        using relay_gen_from_this = detail::relay_generator<detail::generator_type::complex, kthook_impl, Convention, Ret, Args...>;
+
+        friend relay_gen_from_this;
+        template <typename FuncSig>
+        class hook_signal : public ktsignal::ktsignal_threadsafe<FuncSig> {
+            using ktsignal::ktsignal_threadsafe<FuncSig>::emit;
+            using ktsignal::ktsignal_threadsafe<FuncSig>::emit_iterate;
+            friend relay_gen_from_this;
+        };
+
+        template<class T, class Enable = void>
+        struct on_after_type {
+            using type = hook_signal<void(std::add_lvalue_reference_t<Args>...)>;
+        };
+
+        template<class T>
+        struct on_after_type<T, typename std::enable_if<!std::is_void_v<T>>::type> {
+            using type = hook_signal<void(Ret&, std::add_lvalue_reference_t<Args>...)>;
+        };
+
+        template<class T, class Enable = void>
+        struct on_before_type {
+            using type = hook_signal<bool(std::add_lvalue_reference_t<Args>...) >;
+        };
+
+        template<class T>
+        struct on_before_type<T, typename std::enable_if<!std::is_void_v<T>>::type> {
+            using type = hook_signal<detail::return_value<T>(std::add_lvalue_reference_t<Args>...) >;
+        };
+
+        template<class T>
+        struct on_before_simple_type {
+            using type = hook_signal<bool(std::add_lvalue_reference_t<Args>...) >;
+        };
+
+        using on_after_type_t = on_after_type<Ret>::type;
+        using on_before_type_t = on_before_type<Ret>::type;
+        using on_before_simple_type_t = on_before_simple_type<Ret>::type;
+        using kthook_internal_impl<Convention, Ret, Args...>::relay;
+        using kthook_internal_impl<Convention, Ret, Args...>::hook_address;
+    public:
+#ifdef _WIN32
+        kthook_impl(void* dest, bool force_install = true) {
+#else
+        kthook_impl(Ret(*dest)(Args...), bool force_install = true) {
+#endif
+            relay = reinterpret_cast<void*>(&relay_gen_from_this::relay);
+            hook_address = reinterpret_cast<std::uintptr_t>(dest);
+            if (force_install)
+                this->install();
+        }
+
+        on_before_simple_type_t before_simple;
+        on_before_type_t before;
+        on_after_type_t after;
+    };
+
+    template <typename FuncPointerSig>
     struct kthook {};
 
-    template <auto* f, typename Ret, typename... Args>
-    struct kthook<f, Ret(CCDECL*)(Args...)> {
-        using type = kthook_impl<f, func_type_traits::function_convention_v<decltype(f)>, Ret, Args...>;
+    template <typename Ret, typename... Args>
+    struct kthook<Ret(CCDECL*)(Args...)> {
+        using type = kthook_impl<kthook_type::medium, hook_type_traits::cconv::ccdecl, Ret, Args...>;
+    };
+#ifdef _WIN32
+    template <typename Ret, typename... Args>
+    struct kthook<Ret(CSTDCALL*)(Args...)> {
+        using type = kthook_impl<kthook_type::medium, hook_type_traits::cconv::cstdcall, Ret, Args...>;
     };
 
-    template <auto* f, typename Ret, typename... Args>
-    struct kthook<f, Ret(CSTDCALL*)(Args...)> {
-        using type = kthook_impl<f, func_type_traits::function_convention_v<decltype(f)>, Ret, Args...>;
+    template < typename Ret, typename... Args>
+    struct kthook<Ret(CTHISCALL*)(Args...)> {
+        using type = kthook_impl<kthook_type::medium, hook_type_traits::cconv::cthiscall, Ret, Args...>;
     };
 
-    template <auto* f, typename Ret, typename... Args>
-    struct kthook<f, Ret(CTHISCALL*)(Args...)> {
-        using type = kthook_impl<f, func_type_traits::function_convention_v<decltype(f)>, Ret, Args...>;
+    template <typename Ret, typename... Args>
+    struct kthook<Ret(CFASTCALL*)(Args...)> {
+        using type = kthook_impl<kthook_type::medium, hook_type_traits::cconv::cfastcall, Ret, Args...>;
+    };
+#endif
+    template <typename FuncPointerSig>
+    using kthook_t = typename kthook<FuncPointerSig>::type;
+
+    template <typename FuncPointerSig>
+    struct kthook_simple {};
+
+    template <typename Ret, typename... Args>
+    struct kthook_simple<Ret(CCDECL*)(Args...)> {
+        using type = kthook_impl<kthook_type::simple, hook_type_traits::cconv::ccdecl, Ret, Args...>;
+    };
+#ifdef _WIN32
+    template <typename Ret, typename... Args>
+    struct kthook_simple<Ret(CSTDCALL*)(Args...)> {
+        using type = kthook_impl<kthook_type::simple, hook_type_traits::cconv::cstdcall, Ret, Args...>;
     };
 
-    template <auto* f, typename Ret, typename... Args>
-    struct kthook<f, Ret(CFASTCALL*)(Args...)> {
-        using type = kthook_impl<f, func_type_traits::function_convention_v<decltype(f)>, Ret, Args...>;
+    template <typename Ret, typename... Args>
+    struct kthook_simple<Ret(CTHISCALL*)(Args...)> {
+        using type = kthook_impl<kthook_type::simple, hook_type_traits::cconv::cthiscall, Ret, Args...>;
     };
 
-    template <auto* f>
-    using kthook_t = typename kthook<f>::type;
+    template <typename Ret, typename... Args>
+    struct kthook_simple<Ret(CFASTCALL*)(Args...)> {
+        using type = kthook_impl<kthook_type::simple, hook_type_traits::cconv::cfastcall, Ret, Args...>;
+    };
+#endif
+    template <typename FuncPointerSig>
+    using kthook_simple_t = typename kthook_simple<FuncPointerSig>::type;
+
+    template <typename FuncPointerSig>
+    struct kthook_complex {};
+
+    template <typename Ret, typename... Args>
+    struct kthook_complex<Ret(CCDECL*)(Args...)> {
+        using type = kthook_impl<kthook_type::complex, hook_type_traits::cconv::ccdecl, Ret, Args...>;
+    };
+#ifdef _WIN32
+    template <typename Ret, typename... Args>
+    struct kthook_complex<Ret(CSTDCALL*)(Args...)> {
+        using type = kthook_impl<kthook_type::complex, hook_type_traits::cconv::cstdcall, Ret, Args...>;
+    };
+
+    template <typename Ret, typename... Args>
+    struct kthook_complex<Ret(CTHISCALL*)(Args...)> {
+        using type = kthook_impl<kthook_type::complex, hook_type_traits::cconv::cthiscall, Ret, Args...>;
+    };
+
+    template <typename Ret, typename... Args>
+    struct kthook_complex<Ret(CFASTCALL*)(Args...)> {
+        using type = kthook_impl<kthook_type::complex, hook_type_traits::cconv::cfastcall, Ret, Args...>;
+    };
+
+    template <typename FuncPointerSig>
+    using kthook_complex_t = typename kthook_complex<FuncPointerSig>::type;
+#endif
+
+    using detail::return_value;
 }
 #endif // KTHOOK_HPP
