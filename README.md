@@ -10,6 +10,8 @@ Clone repository and simply include kthook.hpp. C++17 compatible compiler requir
 
 Callbacks backend is [ktsignal](https://github.com/KiN4StAt/ktsignal)
 
+All hooks are automatically removed in the `kthook` destructor
+
 All examples are shown based on this function
 
 ```cpp
@@ -23,7 +25,8 @@ int CFASTCALL func1(float a, float b) {
 ### Basics
 
 Creating hook and binding callback \
-In a simple hook object, the before event can return true to continue execution, or false to abort(useful in hooks with void return type)
+In a simple hook object, the before event can return true to continue execution, or false to abort(useful in hooks with void return type) \
+All hooks are installed after object creation by default
 
 ```cpp
 int main() {
@@ -41,6 +44,46 @@ int main() {
 
     /*
     [operator () at 31]: a = 30; b = 20
+    [func1 at 16 ]: a = 30; b = 20
+    */
+    func1(30.f, 20.f);
+}
+```
+
+Creating a hook with a deferred installation, as well as deleting it
+
+```cpp
+int main() {
+    // func_ptr is pointer to function
+    auto func_ptr = &func1;
+
+    // func_type is int(CFASTCALL*)(float, float)
+    using func_type = decltype(&func1);
+
+    // Creating simple hook object with function type is template parameter and function pointer in constructor
+    kthook::kthook_simple_t<func_type> hook{ func_ptr, false };
+
+    // Connecting lambda callback that receiving function arguments by references
+    hook.before.connect([](float& a, float& b) { print_info(a, b); return true; });
+
+    /*
+    [func1 at 16 ]: a = 30; b = 20
+    */
+    func1(30.f, 20.f);
+    
+    // hook installing
+    hook.install();
+
+    /*
+    [operator () at 31]: a = 30; b = 20
+    [func1 at 16 ]: a = 30; b = 20
+    */
+    func1(30.f, 20.f);
+
+    // hook removing
+    hook.remove();
+
+    /*
     [func1 at 16 ]: a = 30; b = 20
     */
     func1(30.f, 20.f);
