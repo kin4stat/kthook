@@ -90,7 +90,7 @@ int main() {
 }
 ```
 
-Also you bind after original function execution callbacks \
+Also you can bind after original function execution callbacks \
 If original function return value is non void, return value reference passed at 1 argument
 
 ```cpp
