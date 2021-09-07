@@ -20,8 +20,8 @@
 
 #include "kthook_traits.hpp"
 #include "kthook_detail.hpp"
-#include "xbyak/xbyak.h"
-#include "ktsignal.hpp"
+#include "xbyak/xbyak/xbyak.h"
+#include "ktsignal/include/ktsignal.hpp"
 #include <memory>
 #include <type_traits>
 #include <cstdint>
