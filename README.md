@@ -8,6 +8,8 @@ Clone repository and simply include kthook.hpp. C++17 compatible compiler requir
 
 ## Examples
 
+Callbacks backend is [ktsignal](https://github.com/KiN4StAt/ktsignal)
+
 All examples are shown based on this function
 
 ```cpp
