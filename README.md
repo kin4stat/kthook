@@ -1,4 +1,4 @@
-# ktsignal
+# kthook
 
 X86 hooking library with functor callbacks support, so you can use lambdas with state, std::bind values etc...
 
