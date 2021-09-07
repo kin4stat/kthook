@@ -20,8 +20,8 @@
 
 #include "kthook_traits.hpp"
 #include "kthook_detail.hpp"
-#include "xbyak/xbyak/xbyak.h"
-#include "ktsignal/include/ktsignal.hpp"
+#include "../xbyak/xbyak.h"
+#include "../ktsignal/include/ktsignal.hpp"
 #include <memory>
 #include <type_traits>
 #include <cstdint>
@@ -40,11 +40,11 @@
 namespace kthook {
 
 #ifdef KTHOOK_64
-#include "./hde/hde64.h"
+#include "../hde/hde64.h"
     using hde = hde64s;
 #define hde_disasm(code, hs) hde64_disasm(code, hs)
 #else
-#include "./hde/hde32.h"
+#include "../hde/hde32.h"
     using hde = hde32s;
 #define hde_disasm(code, hs) hde32_disasm(code, hs)
 #endif
