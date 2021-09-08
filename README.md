@@ -156,7 +156,7 @@ int main() {
 
 A few important notes about `kthook_simple_t`
 - Function return type must be default-constructible
-- If any before callback returns false, the original function and after callback are not called. Default constructed value is returned
+- If any before callback returns false, and function return type is non void, the original function and after callback are not called. Default constructed value is returned
 
 ### Advanced Usage
 
