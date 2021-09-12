@@ -413,8 +413,8 @@ namespace kthook {
                 using type = hook_signal<bool(std::add_lvalue_reference_t<Args>...) >;
             };
 
-            using on_after_type_t = on_after_type<Ret>::type;
-            using on_before_type_t = on_before_type<Ret>::type;
+            using on_after_type_t = typename on_after_type<Ret>::type;
+            using on_before_type_t = typename on_before_type<Ret>::type;
             using kthook_internal_impl<Convention, Ret, Args...>::relay;
             using kthook_internal_impl<Convention, Ret, Args...>::hook_address;
         public:
@@ -465,8 +465,8 @@ namespace kthook {
                 using type = hook_signal<detail::return_value<T>(std::add_lvalue_reference_t<Args>...) >;
             };
 
-            using on_after_type_t = on_after_type<Ret>::type;
-            using on_before_type_t = on_before_type<Ret>::type;
+            using on_after_type_t = typename on_after_type<Ret>::type;
+            using on_before_type_t = typename on_before_type<Ret>::type;
             using kthook_internal_impl<Convention, Ret, Args...>::relay;
             using kthook_internal_impl<Convention, Ret, Args...>::hook_address;
         public:
@@ -522,9 +522,9 @@ namespace kthook {
                 using type = hook_signal<bool(std::add_lvalue_reference_t<Args>...) >;
             };
 
-            using on_after_type_t = on_after_type<Ret>::type;
-            using on_before_type_t = on_before_type<Ret>::type;
-            using on_before_simple_type_t = on_before_simple_type<Ret>::type;
+            using on_after_type_t = typename on_after_type<Ret>::type;
+            using on_before_type_t = typename on_before_type<Ret>::type;
+            using on_before_simple_type_t = typename on_before_simple_type<Ret>::type;
             using kthook_internal_impl<Convention, Ret, Args...>::relay;
             using kthook_internal_impl<Convention, Ret, Args...>::hook_address;
         public:
