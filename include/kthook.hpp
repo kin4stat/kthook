@@ -418,6 +418,7 @@ namespace kthook {
             using kthook_internal_impl<Convention, Ret, Args...>::relay;
             using kthook_internal_impl<Convention, Ret, Args...>::hook_address;
         public:
+            kthook_impl(std::uintptr_t dest, bool force_install = true) : kthook_impl(reinterpret_cast<void*>(dest), force_install) {}
 #ifdef _WIN32
             kthook_impl(void* dest, bool force_install = true) {
 #else
@@ -470,6 +471,7 @@ namespace kthook {
             using kthook_internal_impl<Convention, Ret, Args...>::relay;
             using kthook_internal_impl<Convention, Ret, Args...>::hook_address;
         public:
+            kthook_impl(std::uintptr_t dest, bool force_install = true) : kthook_impl(reinterpret_cast<void*>(dest), force_install) {}
 #ifdef _WIN32
             kthook_impl(void* dest, bool force_install = true) {
 #else
@@ -528,6 +530,7 @@ namespace kthook {
             using kthook_internal_impl<Convention, Ret, Args...>::relay;
             using kthook_internal_impl<Convention, Ret, Args...>::hook_address;
         public:
+            kthook_impl(std::uintptr_t dest, bool force_install = true) : kthook_impl(reinterpret_cast<void*>(dest), force_install) {}
 #ifdef _WIN32
             kthook_impl(void* dest, bool force_install = true) {
 #else
