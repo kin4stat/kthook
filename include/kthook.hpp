@@ -356,7 +356,7 @@ namespace kthook {
                     jump_gen->pop(eax);
                 }
                 if constexpr (Convention == hook_type_traits::cconv::cthiscall) {
-                    jump_gen->pop(ecx);
+                    jump_gen->push(ecx);
                 }
                 jump_gen->push(reinterpret_cast<std::uintptr_t>(this));
                 if constexpr (Convention == hook_type_traits::cconv::ccdecl) {
