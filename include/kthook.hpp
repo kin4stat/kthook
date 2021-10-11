@@ -240,7 +240,7 @@ namespace kthook {
 
                         // Relative address is stored at (instruction length - immediate value length - 4).
                         pRelAddr = reinterpret_cast<std::uint32_t*>(inst_buf + hs.len - ((hs.flags & 0x3C) >> 2) - 4);
-                        *pRelAddr = reinterpret_cast<std::uint32_t>((current_address + hs.len + hs.disp.disp32) - (trampoline_gen->getCurr() + trampoline_size + hs.len));
+                        *pRelAddr = reinterpret_cast<std::uint32_t>((current_address + hs.len + hs.disp.disp32) - (trampoline_gen->getCurr() + hs.len));
 
                         // Complete the function if JMP (FF /4).
                         if (hs.opcode == 0xFF && hs.modrm_reg == 4)
@@ -255,7 +255,7 @@ namespace kthook {
                         call.address = call_destination;
 #else
                         call.operand = get_relative_address(call_destination,
-                            reinterpret_cast<std::uintptr_t>(trampoline_gen->getCurr() + trampoline_size), sizeof(call));
+                            reinterpret_cast<std::uintptr_t>(trampoline_gen->getCurr()), sizeof(call));
 #endif
                         op_copy_src = &call;
                         op_copy_size = sizeof(call);
@@ -282,7 +282,7 @@ namespace kthook {
                             jmp.address = jmp_destination;
 #else
                             jmp.operand = get_relative_address(jmp_destination,
-                                reinterpret_cast<std::uintptr_t>(trampoline_gen->getCurr() + trampoline_size), sizeof(jmp));
+                                reinterpret_cast<std::uintptr_t>(trampoline_gen->getCurr()), sizeof(jmp));
 #endif
                             op_copy_src = &jmp;
                             op_copy_size = sizeof(jmp);
@@ -326,7 +326,7 @@ namespace kthook {
 #else
                             jcc.opcode1 = 0x80 | cond;
                             jcc.operand = get_relative_address(jmp_destination,
-                                reinterpret_cast<std::uintptr_t>(trampoline_gen->getCurr() + trampoline_size), sizeof(jcc));
+                                reinterpret_cast<std::uintptr_t>(trampoline_gen->getCurr()), sizeof(jcc));
 #endif
                             op_copy_src = &jcc;
                             op_copy_size = sizeof(jcc);
@@ -380,7 +380,6 @@ namespace kthook {
         enum class kthook_type {
             simple,
             medium,
-            complex,
         };
 
         template <kthook_type hook_type, hook_type_traits::cconv Convention, typename Ret, typename... Args>
@@ -487,66 +486,6 @@ namespace kthook {
             on_after_type_t after;
             };
 
-        template <hook_type_traits::cconv Convention, typename Ret, typename... Args>
-        class kthook_impl<kthook_type::complex, Convention, Ret, Args...> : public kthook_internal_impl<Convention, Ret, Args...> {
-            using relay_gen_from_this = detail::relay_generator<detail::generator_type::complex, kthook_impl, Convention, Ret, Args...>;
-
-            friend relay_gen_from_this;
-            template <typename FuncSig>
-            class hook_signal : public ktsignal::ktsignal_threadsafe<FuncSig> {
-                using ktsignal::ktsignal_threadsafe<FuncSig>::emit;
-                using ktsignal::ktsignal_threadsafe<FuncSig>::emit_iterate;
-                friend relay_gen_from_this;
-            };
-
-            template<class T, class Enable = void>
-            struct on_after_type {
-                using type = hook_signal<void(std::add_lvalue_reference_t<Args>...)>;
-            };
-
-            template<class T>
-            struct on_after_type<T, typename std::enable_if<!std::is_void_v<T>>::type> {
-                using type = hook_signal<void(Ret&, std::add_lvalue_reference_t<Args>...)>;
-            };
-
-            template<class T, class Enable = void>
-            struct on_before_type {
-                using type = hook_signal<bool(std::add_lvalue_reference_t<Args>...) >;
-            };
-
-            template<class T>
-            struct on_before_type<T, typename std::enable_if<!std::is_void_v<T>>::type> {
-                using type = hook_signal<detail::return_value<T>(std::add_lvalue_reference_t<Args>...) >;
-            };
-
-            template<class T>
-            struct on_before_simple_type {
-                using type = hook_signal<bool(std::add_lvalue_reference_t<Args>...) >;
-            };
-
-            using on_after_type_t = typename on_after_type<Ret>::type;
-            using on_before_type_t = typename on_before_type<Ret>::type;
-            using on_before_simple_type_t = typename on_before_simple_type<Ret>::type;
-            using kthook_internal_impl<Convention, Ret, Args...>::relay;
-            using kthook_internal_impl<Convention, Ret, Args...>::hook_address;
-        public:
-            kthook_impl(std::uintptr_t dest, bool force_install = true) : kthook_impl(reinterpret_cast<void*>(dest), force_install) {}
-#ifdef _WIN32
-            kthook_impl(void* dest, bool force_install = true) {
-#else
-            kthook_impl(Ret(*dest)(Args...), bool force_install = true) {
-#endif
-                relay = reinterpret_cast<void*>(&relay_gen_from_this::relay);
-                hook_address = reinterpret_cast<std::uintptr_t>(dest);
-                if (force_install)
-                    this->install();
-            }
-
-            on_before_simple_type_t before_simple;
-            on_before_type_t before;
-            on_after_type_t after;
-            };
-
         template <typename FuncPointerSig>
         struct kthook {};
 
@@ -603,34 +542,6 @@ namespace kthook {
             using type = kthook_impl<kthook_type::simple, hook_type_traits::cconv::cfastcall, Ret, Args...>;
         };
 #endif
-        template <typename FuncPointerSig>
-        struct kthook_complex {};
-
-        template <typename Ret, typename... Args>
-        struct kthook_complex<Ret(CCDECL*)(Args...)> {
-            using type = kthook_impl<kthook_type::complex, hook_type_traits::cconv::ccdecl, Ret, Args...>;
-        };
-#ifdef _WIN32
-        template <typename Ret, typename... Args>
-        struct kthook_complex<Ret(CSTDCALL*)(Args...)> {
-            using type = kthook_impl<kthook_type::complex, hook_type_traits::cconv::cstdcall, Ret, Args...>;
-        };
-
-        template <typename Ret, typename... Args>
-        struct kthook_complex<Ret(CTHISCALL*)(Args...)> {
-            using type = kthook_impl<kthook_type::complex, hook_type_traits::cconv::cthiscall, Ret, Args...>;
-        };
-
-        template <class ClassName, typename Ret, typename... Args>
-        struct kthook_complex<Ret(ClassName::*)(Args...)> {
-            using type = kthook_impl<kthook_type::complex, hook_type_traits::cconv::cthiscall, Ret, Args...>;
-        };
-
-        template <typename Ret, typename... Args>
-        struct kthook_complex<Ret(CFASTCALL*)(Args...)> {
-            using type = kthook_impl<kthook_type::complex, hook_type_traits::cconv::cfastcall, Ret, Args...>;
-        };
-#endif
     }
 
 
@@ -639,9 +550,6 @@ namespace kthook {
 
     template <typename FuncPointerSig>
     using kthook_simple_t = typename detail::kthook_simple<FuncPointerSig>::type;
-
-    template <typename FuncPointerSig>
-    using kthook_complex_t = typename detail::kthook_complex<FuncPointerSig>::type;
 
     using detail::return_value;
 }

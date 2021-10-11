@@ -46,27 +46,18 @@ namespace kthook {
     };
 
     namespace detail {
-        enum class generator_type {
-            simple,
-            complex,
-        };
-#ifdef KTHOOK_32
-        template <generator_type GenType, typename HookType, hook_type_traits::cconv Convention, typename Ret, typename... Args>
+#if defined(KTHOOK_32)
+        template <typename HookType, hook_type_traits::cconv Convention, typename Ret, typename... Args>
         struct relay_generator;
 #ifdef _WIN32
-        template <generator_type GenType, typename HookType, typename Ret, typename... Args>
-        struct relay_generator<GenType, HookType, hook_type_traits::cconv::cstdcall, Ret, Args...> {
+        template <typename HookType, typename Ret, typename... Args>
+        struct relay_generator<HookType, hook_type_traits::cconv::cstdcall, Ret, Args...> {
             static Ret CSTDCALL relay(HookType* this_hook, Args... args) {
                 using SourceType = Ret(CSTDCALL*)(Args...);
 
                 if constexpr (std::is_void_v<Ret>) {
                     auto before_iterate = this_hook->before.emit_iterate(args...);
                     bool dont_skip_original = true;
-                    if constexpr (GenType == generator_type::complex) {
-                        for (bool callback_ret : this_hook->before_simple.emit_iterate(args...)) {
-                            dont_skip_original &= callback_ret;
-                        }
-                    }
                     for (auto return_value : before_iterate) {
                         dont_skip_original &= return_value;
                     }
@@ -78,11 +69,6 @@ namespace kthook {
                     auto before_iterate = this_hook->before.emit_iterate(args...);
                     bool dont_skip_original = true;
                     Ret ret_value;
-                    if constexpr (GenType == generator_type::complex) {
-                        for (bool callback_ret : this_hook->before_simple.emit_iterate(args...)) {
-                            dont_skip_original &= callback_ret;
-                        }
-                    }
                     for (detail::return_value<Ret> callback_ret : before_iterate) {
                         dont_skip_original &= callback_ret.dont_skip;
                         if (!callback_ret.dont_skip) {
@@ -99,19 +85,14 @@ namespace kthook {
             }
         };
 
-        template <generator_type GenType, typename HookType, typename Ret, typename... Args>
-        struct relay_generator<GenType, HookType, hook_type_traits::cconv::cthiscall, Ret, Args...> {
+        template <typename HookType, typename Ret, typename... Args>
+        struct relay_generator<HookType, hook_type_traits::cconv::cthiscall, Ret, Args...> {
             static Ret CSTDCALL relay(HookType* this_hook, Args... args) {
                 using SourceType = Ret(CTHISCALL*)(Args...);
 
                 if constexpr (std::is_void_v<Ret>) {
                     auto before_iterate = this_hook->before.emit_iterate(args...);
                     bool dont_skip_original = true;
-                    if constexpr (GenType == generator_type::complex) {
-                        for (bool callback_ret : this_hook->before_simple.emit_iterate(args...)) {
-                            dont_skip_original &= callback_ret;
-                        }
-                    }
                     for (auto return_value : before_iterate) {
                         dont_skip_original &= return_value;
                     }
@@ -123,11 +104,6 @@ namespace kthook {
                     auto before_iterate = this_hook->before.emit_iterate(args...);
                     bool dont_skip_original = true;
                     Ret ret_value;
-                    if constexpr (GenType == generator_type::complex) {
-                        for (bool callback_ret : this_hook->before_simple.emit_iterate(args...)) {
-                            dont_skip_original &= callback_ret;
-                        }
-                    }
                     for (detail::return_value<Ret> callback_ret : before_iterate) {
                         dont_skip_original &= callback_ret.dont_skip;
                         if (!callback_ret.dont_skip) {
@@ -144,8 +120,8 @@ namespace kthook {
             }
         };
 
-        template <generator_type GenType, typename HookType, typename Ret, typename... Args>
-        struct relay_generator<GenType, HookType, hook_type_traits::cconv::cfastcall, Ret, Args...> {
+        template <typename HookType, typename Ret, typename... Args>
+        struct relay_generator<HookType, hook_type_traits::cconv::cfastcall, Ret, Args...> {
 
             // fastcall uses registers for first two integral/pointer types (left->right)
             // so we can use this trick to get outr hook object from stack
@@ -160,11 +136,6 @@ namespace kthook {
                 if constexpr (std::is_void_v<Ret>) {
                     auto before_iterate = this_hook->before.emit_iterate(args...);
                     bool dont_skip_original = true;
-                    if constexpr (GenType == generator_type::complex) {
-                        for (bool callback_ret : this_hook->before_simple.emit_iterate(args...)) {
-                            dont_skip_original &= callback_ret;
-                        }
-                    }
                     for (auto return_value : before_iterate) {
                         dont_skip_original &= return_value;
                     }
@@ -176,11 +147,6 @@ namespace kthook {
                     auto before_iterate = this_hook->before.emit_iterate(args...);
                     bool dont_skip_original = true;
                     Ret ret_value;
-                    if constexpr (GenType == generator_type::complex) {
-                        for (bool callback_ret : this_hook->before_simple.emit_iterate(args...)) {
-                            dont_skip_original &= callback_ret;
-                        }
-                    }
                     for (detail::return_value<Ret> callback_ret : before_iterate) {
                         dont_skip_original &= callback_ret.dont_skip;
                         if (!callback_ret.dont_skip) {
@@ -197,19 +163,14 @@ namespace kthook {
             }
         };
 #endif // _WiN32
-        template <generator_type GenType, typename HookType, typename Ret, typename... Args>
-        struct relay_generator<GenType, HookType, hook_type_traits::cconv::ccdecl, Ret, Args...> {
+        template <typename HookType, typename Ret, typename... Args>
+        struct relay_generator<HookType, hook_type_traits::cconv::ccdecl, Ret, Args...> {
             static Ret CCDECL relay(HookType* this_hook, std::uintptr_t retaddr, Args... args) {
                 using SourceType = Ret(CCDECL*)(Args...);
 
                 if constexpr (std::is_void_v<Ret>) {
                     auto before_iterate = this_hook->before.emit_iterate(args...);
                     bool dont_skip_original = true;
-                    if constexpr (GenType == generator_type::complex) {
-                        for (bool callback_ret : this_hook->before_simple.emit_iterate(args...)) {
-                            dont_skip_original &= callback_ret;
-                        }
-                    }
                     for (auto return_value : before_iterate) {
                         dont_skip_original &= return_value;
                     }
@@ -221,11 +182,6 @@ namespace kthook {
                     auto before_iterate = this_hook->before.emit_iterate(args...);
                     bool dont_skip_original = true;
                     Ret ret_value;
-                    if constexpr (GenType == generator_type::complex) {
-                        for (bool callback_ret : this_hook->before_simple.emit_iterate(args...)) {
-                            dont_skip_original &= callback_ret;
-                        }
-                    }
                     for (detail::return_value<Ret> callback_ret : before_iterate) {
                         dont_skip_original &= callback_ret.dont_skip;
                         if (!callback_ret.dont_skip) {
@@ -241,8 +197,6 @@ namespace kthook {
                 }
             }
         };
-#endif // KTHOOK_32
-#ifdef KTHOOK_32
         template <typename HookType, hook_type_traits::cconv Convention, typename Ret, typename... Args>
         struct relay_simple_generator;
 #ifdef _WIN32
@@ -361,7 +315,49 @@ namespace kthook {
                     return Ret{};
             }
         };
-#endif // KTHOOK_32
+
+#elif defined(KTHOOK_64)
+
+        template <typename HookType, typename Ret, typename... Args>
+        struct relay_generator {
+            static Ret relay(HookType* this_hook, Args... args) {
+                using SourceType = Ret(*)(Args...);
+
+                if constexpr (std::is_void_v<Ret>) {
+                    auto before_iterate = this_hook->before.emit_iterate(args...);
+                    bool dont_skip_original = true;
+                    for (auto return_value : before_iterate) {
+                        dont_skip_original &= return_value;
+                    }
+                    SourceType func;
+                    memcpy(func, this_hook->trampoline, sizeof(this_hook->trampoline));
+                    func(this_hook->trampoline)(args...);
+                    this_hook->after.emit(args...);
+                    return;
+                }
+                else {
+                    auto before_iterate = this_hook->before.emit_iterate(args...);
+                    bool dont_skip_original = true;
+                    Ret ret_value;
+                    for (detail::return_value<Ret> callback_ret : before_iterate) {
+                        dont_skip_original &= callback_ret.dont_skip;
+                        if (!callback_ret.dont_skip) {
+                            ret_value = callback_ret.ret_val.value();
+                        }
+                    }
+                    if (dont_skip_original) {
+                        SourceType func;
+                        memcpy(func, this_hook->trampoline, sizeof(this_hook->trampoline));
+                        func(this_hook->trampoline)(args...);
+                        ret_value = std::move(func(this_hook->trampoline)(args...));
+                        this_hook->after.emit(ret_value, args...);
+                        return ret_value;
+                    }
+                    return ret_value;
+                }
+            }
+        };
+#endif // KTHOOK_32 or KTHOOK_64
     }
 }
 #endif // KTHOOK_DETAIL_HPP_
