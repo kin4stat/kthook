@@ -15,7 +15,7 @@ All hooks are automatically removed in the `kthook` destructor
 All examples are shown based on this function
 
 ```cpp
-int CFASTCALL func1(float a, float b) {
+int FASTCALL func1(float a, float b) {
     print_info(a, b);
     a = 50; b = 100;
     return 5;
@@ -25,8 +25,8 @@ int CFASTCALL func1(float a, float b) {
 ### Basics
 
 Creating hook and binding callback \
-In a simple hook object, the before event can return true to continue execution, or false to abort(useful in hooks with void return type) \
-All hooks are installed after object creation by default
+All callbacks are given a reference to kthook as the first argument. You can get return address and trampoline pointer from hook object. \
+Hooks are installed after construction by default(last parameter can be set to false to prevent this)
 
 ```cpp
 int main() {
@@ -37,10 +37,13 @@ int main() {
     using func_type = decltype(&func1);
 
     // Creating simple hook object with function type is template parameter and function pointer in constructor
-    kthook::kthook_simple_t<func_type> hook{ func_ptr };
+    kthook::kthook_signal<func_type> hook{ func_ptr };
 
     // Connecting lambda callback that receiving function arguments by references
-    hook.before.connect([](float& a, float& b) { print_info(a, b); return true; });
+    hook.before += [](const auto& hook, float& a, float& b) {
+        print_info(a, b);
+        return true;
+    };
 
     /*
     [operator () at 31]: a = 30; b = 20
@@ -50,8 +53,7 @@ int main() {
 }
 ```
 
-Creating a hook with a deferred installation, as well as deleting it
-
+Same thing with common hooks:
 ```cpp
 int main() {
     // func_ptr is pointer to function
@@ -60,30 +62,17 @@ int main() {
     // func_type is int(CFASTCALL*)(float, float)
     using func_type = decltype(&func1);
 
+    auto cb = [](const auto& hook, float a, float b) {
+        print_info(a, b);
+        hook.get_trampoline()(a, b);
+        return true;
+    };
+
     // Creating simple hook object with function type is template parameter and function pointer in constructor
-    kthook::kthook_simple_t<func_type> hook{ func_ptr, false };
-
-    // Connecting lambda callback that receiving function arguments by references
-    hook.before.connect([](float& a, float& b) { print_info(a, b); return true; });
-
-    /*
-    [func1 at 16 ]: a = 30; b = 20
-    */
-    func1(30.f, 20.f);
-    
-    // hook installing
-    hook.install();
+    kthook::kthook_simple<func_type> hook{ func_ptr, cb };
 
     /*
     [operator () at 31]: a = 30; b = 20
-    [func1 at 16 ]: a = 30; b = 20
-    */
-    func1(30.f, 20.f);
-
-    // hook removing
-    hook.remove();
-
-    /*
     [func1 at 16 ]: a = 30; b = 20
     */
     func1(30.f, 20.f);
@@ -91,7 +80,7 @@ int main() {
 ```
 
 Also you can bind after original function execution callbacks \
-If original function return value is non void, return value reference passed at 1 argument
+If original function return value is non void, return value reference passed at 2 argument
 
 ```cpp
 int main() {
@@ -100,7 +89,7 @@ int main() {
 
     kthook::kthook_simple_t<func_type> hook{ func_ptr };
 
-    hook.before.connect([](float& a, float& b) { 
+    hook.before.connect([](const auto& hook, float& a, float& b) { 
         print_info(a, b);
         // changing arguments
         a = 50.f, b = 30.f; 
@@ -108,7 +97,7 @@ int main() {
         });
 
     // connect after callback
-    hook.after.connect([](int& return_value, float& a, float& b) {
+    hook.after.connect([](const auto& hook, int& return_value, float& a, float& b) {
         print_info(a, b);
         print_return_value(return_value);
 
@@ -138,10 +127,10 @@ int main() {
 
     kthook::kthook_simple_t<func_type> hook{ func_ptr };
 
-    hook.before.connect([](float& a, float& b) { print_info(a, b); return true; });
-    hook.before.connect([](float& a, float& b) { a = 20; b = 30; return true; });
-    hook.after.connect([](int& ret_val, float& a, float& b) { print_info(a, b); });
-    hook.after.connect([](int& ret_val, float& a, float& b) { print_info(a, b); });
+    hook.before.connect([](const auto& hook, float& a, float& b) { print_info(a, b); return true; });
+    hook.before.connect([](const auto& hook, float& a, float& b) { a = 20; b = 30; return true; });
+    hook.after.connect([](const auto& hook, int& ret_val, float& a, float& b) { print_info(a, b); });
+    hook.after.connect([](const auto& hook, int& ret_val, float& a, float& b) { print_info(a, b); });
     /*
     [operator () at 31]: a = 0; b = 0
     [func1 at 16]: a = 20; b = 30
@@ -154,26 +143,25 @@ int main() {
 }
 ```
 
-A few important notes about `kthook_simple_t`
+A few important notes about `kthook_signal`
 - Function return type must be default-constructible
 - If any before callback returns false, and function return type is non void, the original function and after callback are not called. Default constructed value is returned
 
 ### Advanced Usage
 
-There is a kthook_t that allows you to change the return value from a function without calling the original function \
-For generating true return value, you can use `kthook::return_value<T>::make_true()` function \
-For generating false return value, you can use `kthook::return_value<T>::make_false(T value)` function
+There is a kthook that allows you to change the return value from a function without calling the original function \
+For generating true return value, you can use `std::make_optional(value)` function \
+For generating false return value, you can use `std::nullopt`
 
 ```cpp
 int main() {
     auto func_ptr = &func1;
     using func_type = decltype(&func1);
 
-    // creating kthook_t object with same interface as kthook_simple_t
-    kthook::kthook_t<func_type> hook{ func_ptr };
-    // binding callback returning true using helper function make_true
-    hook.before.connect([](float& a, float& b) { print_info(a, b); return kthook::return_value<int>::make_true(); });
-    hook.after.connect([](int& ret_val, float& a, float& b) { ret_val = 20; print_info(a, b); });
+    kthook::kthook_signal<func_type> hook{ func_ptr };
+    
+    hook.before.connect([](const auto& hook, float& a, float& b) { print_info(a, b); return std::nullopt; });
+    hook.after.connect([](const auto& hook, int& ret_val, float& a, float& b) { ret_val = 20; print_info(a, b); });
     /*
     [operator () at 44]: a = 30; b = 20
     [func1 at 16]: a = 30; b = 20
@@ -192,38 +180,12 @@ int main() {
     auto func_ptr = &func1;
     using func_type = decltype(&func1);
 
-    kthook::kthook_t<func_type> hook{ func_ptr };
-    // binding callback returning true using helper function make_false
-    hook.before.connect([](float& a, float& b) { print_info(a, b); return kthook::return_value<int>::make_false(20); });
-    hook.after.connect([](int& ret_val, float& a, float& b) { ret_val = 20; print_info(a, b); });
+    kthook::kthook_signal<func_type> hook{ func_ptr };
+    
+    hook.before.connect([](auto& hook, float& a, float& b) { print_info(a, b); return std::make_optional(20); });
+    hook.after.connect([](auto& hook, int& ret_val, float& a, float& b) { ret_val = 20; print_info(a, b); });
     /*
     [operator () at 44]: a = 30; b = 20
-    [main at 20]: return_value = 20;
-    */
-    auto ret_val = func1(30.f, 20.f);
-    print_return_value(ret_val)
-}
-```
-
-### Complex Usage
-
-`kthook_complex_t` gives you the opportunity to combine `kthook_simple_t` and `kthook_t`
-
-```cpp
-int main() {
-    auto func_ptr = &func1;
-    using func_type = decltype(&func1);
-
-    // creating kthook_complex_t object with same interface as kthook_simple_t
-    kthook::kthook_complex_t<func_type> hook{ func_ptr };
-    // binding callback returning true using helper function make_true
-    hook.before_simple.connect([](float& a, float& b) { print_info(a, b); return true; });
-    hook.before.connect([](float& a, float& b) { print_info(a, b); return kthook::return_value<int>::make_true(); });
-    hook.after.connect([](int& ret_val, float& a, float& b) { ret_val = 20; print_info(a, b); });
-    /*
-    [operator () at 31]: a = 30; b = 20
-    [operator () at 45]: a = 30; b = 20
-    [func1 at 16]: a = 30; b = 20
     [main at 20]: return_value = 20;
     */
     auto ret_val = func1(30.f, 20.f);
