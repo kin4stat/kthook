@@ -3,7 +3,7 @@
 
 namespace kthook {
 	namespace detail {
-        bool create_trampoline(std::uintptr_t hook_address, const std::unique_ptr<Xbyak::CodeGenerator>& trampoline_gen) {
+        inline bool create_trampoline(std::uintptr_t hook_address, const std::unique_ptr<Xbyak::CodeGenerator>& trampoline_gen) {
             CALL_REL call = {
                 0xE8,                   // E8 xxxxxxxx: CALL +5+xxxxxxxx
                 0x00000000              // Relative destination address
@@ -164,9 +164,9 @@ namespace kthook {
 
     template<typename T>
     class kthook_simple {
-        static_assert(std::is_member_function_pointer_v<T> ||
-            std::is_function_v<std::remove_pointer_t<T>> ||
-            std::is_function_v<T>, "T is not member function pointer/function pointer/function");
+        // static_assert(std::is_member_function_pointer_v<T> ||
+        //     std::is_function_v<std::remove_pointer_t<T>> ||
+        //     std::is_function_v<T>, "T is not member function pointer/function pointer/function");
 
         using function = detail::traits::function_traits<T>;
         using Args = typename function::args;
@@ -377,9 +377,9 @@ namespace kthook {
 
     template<typename T>
     class kthook_signal {
-        static_assert(std::is_member_function_pointer_v<T> ||
-            std::is_function_v<std::remove_pointer_t<T>> ||
-            std::is_function_v<T>, "T is not member function pointer/function pointer/function");
+        // static_assert(std::is_member_function_pointer_v<T> ||
+        //     std::is_function_v<std::remove_pointer_t<T>> ||
+        //     std::is_function_v<T>, "T is not member function pointer/function pointer/function");
 
         template<class T, typename Tuple, typename Enable = void>
         struct on_after_type;
