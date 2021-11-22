@@ -249,6 +249,14 @@ namespace kthook {
             hooks.clear();
         }
 
+        void set_dest(std::uintptr_t address) {
+            hooks.begin()->hook_address = address;
+        }
+
+        void set_dest(void* address) {
+            set_dest(reinterpret_cast<std::uintptr_t>(address));
+        }
+
         std::uintptr_t get_return_address() const {
             return *last_return_address;
         }
@@ -482,6 +490,14 @@ namespace kthook {
                 if (!set_memory_prot(reinterpret_cast<void*>(hook.hook_address), this->hook_size, detail::MemoryProt::PROTECT_RE)) return false;
             }
             hooks.clear();
+        }
+
+        void set_dest(std::uintptr_t address) {
+            hooks.begin()->hook_address = address;
+        }
+
+        void set_dest(void* address) {
+            set_dest(reinterpret_cast<std::uintptr_t>(address));
         }
 
         std::uintptr_t get_return_address() const {
