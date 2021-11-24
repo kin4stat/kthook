@@ -291,10 +291,7 @@ namespace kthook {
             Xbyak::Label UserCode;
             jump_gen->jmp(UserCode, Xbyak::CodeGenerator::LabelType::T_NEAR);
             jump_gen->nop(3);
-            if (info.opcode == 0xE8 || info.opcode == 0xE9) {
-                std::uintptr_t absolute = detail::restore_absolute_address(hook_address, info.operand, 5);
-                jump_gen->jmp(reinterpret_cast<void*>(absolute));
-            }
+            jump_gen->db(trampoline_gen->getCode(), trampoline_gen->getSize());
             jump_gen->L(UserCode);
             if constexpr (std::is_function_v<T>) {
                 static_assert(false, "WIP");
@@ -537,10 +534,7 @@ namespace kthook {
             Xbyak::Label UserCode;
             jump_gen->jmp(UserCode, Xbyak::CodeGenerator::LabelType::T_NEAR);
             jump_gen->nop(3);
-            if (info.opcode == 0xE8 || info.opcode == 0xE9) {
-                std::uintptr_t absolute = detail::restore_absolute_address(hook_address, info.operand, 5);
-                jump_gen->jmp(reinterpret_cast<void*>(absolute));
-            }
+            jump_gen->db(trampoline_gen->getCode(), trampoline_gen->getSize());
             jump_gen->L(UserCode);
             if constexpr (std::is_function_v<T>) {
                 static_assert(false, "WIP");

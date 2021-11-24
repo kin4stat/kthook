@@ -161,8 +161,10 @@ namespace kthook {
 				for (auto return_value : before_iterate) {
 					dont_skip_original &= return_value;
 				}
-				this_hook->get_trampoline()(args...);
-				this_hook->after.emit(*this_hook, args...);
+				if (dont_skip_original) {
+					this_hook->get_trampoline()(args...);
+					this_hook->after.emit(*this_hook, args...);
+				}
 				return;
 			}
 			else {
