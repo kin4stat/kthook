@@ -249,6 +249,10 @@ namespace kthook {
             hooks.clear();
         }
 
+        void set_cb(cb_type callback_) {
+            callback = std::move(callback_);
+        }
+
         void set_dest(std::uintptr_t address) {
             hooks.begin()->hook_address = address;
         }
@@ -490,7 +494,8 @@ namespace kthook {
         }
 
         void set_dest(std::uintptr_t address) {
-            hooks.begin()->hook_address = address;
+            hooks.clear();
+            hooks.emplace_back(address, nullptr);
         }
 
         void set_dest(void* address) {
