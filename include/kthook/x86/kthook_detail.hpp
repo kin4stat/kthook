@@ -230,7 +230,10 @@ namespace kthook {
 #endif
 		template <typename Callback, typename HookPtrType, typename Ret, typename... Args>
 		inline Ret common_relay(Callback& cb, HookPtrType* this_hook, Args&... args) {
-			return cb(*this_hook, args...);
+			if (cb)
+				return cb(*this_hook, args...);
+			else
+				return this_hook->get_trampoline()(args...);
 		}
 
 		template <typename HookPtrType, traits::cconv Convention, typename Ret, typename Tuple>

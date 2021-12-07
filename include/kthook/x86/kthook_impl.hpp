@@ -198,6 +198,14 @@ namespace kthook {
             }
         }
 
+        kthook_simple(std::uintptr_t destination) {
+            trampoline_gen = std::make_unique<Xbyak::CodeGenerator>();
+            jump_gen = std::make_unique<Xbyak::CodeGenerator>();
+            hooks.emplace_back(destination, nullptr);
+        }
+
+        kthook_simple(void* destination) : kthook_simple(reinterpret_cast<std::uintptr_t>(destination)) {}
+
         kthook_simple(void* destination, cb_type callback, bool force_enable = true) :
             kthook_simple(reinterpret_cast<std::uintptr_t>(destination), callback, force_enable) {}
 
