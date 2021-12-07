@@ -366,7 +366,7 @@ namespace kthook {
                     jump_gen->rewrite(0, original, 8);
                 }
             }
-            else {
+            else if (relay_jump) {
                 std::memcpy(reinterpret_cast<void*>(&original), relay_jump, sizeof(original));
                 jump_gen->rewrite(0, 0x9090909090909090, 8);
             }
@@ -610,7 +610,7 @@ namespace kthook {
                     jump_gen->rewrite(0, original, 8);
                 }
             }
-            else {
+            else if (relay_jump) {
                 std::memcpy(reinterpret_cast<void*>(&original), relay_jump, sizeof(original));
                 jump_gen->rewrite(0, 0x9090909090909090, 8);
             }
