@@ -262,7 +262,8 @@ namespace kthook {
         }
 
         void set_dest(std::uintptr_t address) {
-            hooks.begin()->hook_address = address;
+            hooks.clear();
+            hooks.emplace_back(address, nullptr);
         }
 
         void set_dest(void* address) {
