@@ -15,10 +15,10 @@
 #endif
 
 #if defined(KTHOOK_64) || defined(KTHOOK_32)
-#include "../xbyak/xbyak.h"
+#include "xbyak/xbyak.h"
 #endif
 
-#include "../ktsignal/include/ktsignal.hpp"
+#include "ktsignal/ktsignal.hpp"
 
 #ifdef _WIN32
 #ifndef WIN32_LEAN_AND_MEAN
@@ -41,7 +41,7 @@
 #if defined(KTHOOK_64)
 
 #elif defined(KTHOOK_32)
-#include "../hde/hde32.h"
+#include "hde/hde32.h"
 #include "x86/kthook_detail.hpp"
 #include "x86/kthook_impl.hpp"
 #endif
