@@ -344,19 +344,11 @@ namespace kthook {
             using namespace Xbyak::util;
 
             auto hook_address = hooks.begin()->hook_address;
-#pragma pack(push, 1)
-            struct {
-                std::uint8_t opcode;
-                std::uint32_t operand;
-            } info;
-
-            std::memcpy(&info, reinterpret_cast<void*>(hook_address), sizeof(info));
-#pragma pack(pop)
 
             Xbyak::Label UserCode;
             jump_gen->jmp(UserCode, Xbyak::CodeGenerator::LabelType::T_NEAR);
             jump_gen->nop(3);
-            jump_gen->db(trampoline_gen->getCode(), trampoline_gen->getSize());
+            detail::create_trampoline(hook_address, jump_gen);
             jump_gen->L(UserCode);
             if constexpr (std::is_function_v<T>) {
                 static_assert(false, "WIP");
@@ -512,29 +504,6 @@ namespace kthook {
         template<typename Ptr>
         kthook_signal(Ptr* destination, bool force_enable = true) : kthook_signal(reinterpret_cast<void*>(destination), force_enable) {}
 
-        // WIP
-        /*kthook_signal(std::initializer_list<std::uintptr_t> addresses, bool force_enable = true) {
-            for (auto&& address : addresses) {
-                hooks.emplace_back(address, nullptr);
-            }
-            trampoline_gen = std::make_unique<Xbyak::CodeGenerator>();
-            jump_gen = std::make_unique<Xbyak::CodeGenerator>();
-            if (force_enable) {
-                install();
-            }
-        }
-
-        kthook_signal(std::initializer_list<void*> addresses, bool force_enable = true){
-            trampoline_gen = std::make_unique<Xbyak::CodeGenerator>();
-            jump_gen = std::make_unique<Xbyak::CodeGenerator>();
-            for (auto&& address : addresses) {
-                hooks.emplace_back(reinterpret_cast<std::uintptr_t>(address), nullptr);
-            }
-            if (force_enable) {
-                install();
-            }
-        }*/
-
         ~kthook_signal() {
             remove();
         }
@@ -597,19 +566,11 @@ namespace kthook {
             using namespace Xbyak::util;
 
             auto hook_address = hooks.begin()->hook_address;
-#pragma pack(push, 1)
-            struct {
-                std::uint8_t opcode;
-                std::uint32_t operand;
-            } info;
-
-            std::memcpy(&info, reinterpret_cast<void*>(hook_address), sizeof(info));
-#pragma pack(pop)
 
             Xbyak::Label UserCode;
             jump_gen->jmp(UserCode, Xbyak::CodeGenerator::LabelType::T_NEAR);
             jump_gen->nop(3);
-            jump_gen->db(trampoline_gen->getCode(), trampoline_gen->getSize());
+            detail::create_trampoline(hook_address, jump_gen);
             jump_gen->L(UserCode);
             if constexpr (std::is_function_v<T>) {
                 static_assert(false, "WIP");
