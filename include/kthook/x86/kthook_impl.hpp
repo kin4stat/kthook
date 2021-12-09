@@ -162,6 +162,53 @@ namespace kthook {
         }
 	}
 
+    #pragma pack(push, 1)
+    struct CPU_Context {
+        std::uint32_t eax;
+        std::uint32_t ecx;
+        std::uint32_t edx;
+        std::uint32_t ebx;
+        std::uint32_t esp;
+        std::uint32_t ebp;
+        std::uint32_t esi;
+        std::uint32_t edi;
+        struct EFLAGS {
+        public:
+            std::uint32_t CF : 1;
+        private:
+            std::uint32_t reserved1 : 1;
+        public:
+            std::uint32_t PF : 1;
+        private:
+            std::uint32_t reserved2 : 1;
+        public:
+            std::uint32_t AF : 1;
+        private:
+            std::uint32_t reserved3 : 1;
+        public:
+            std::uint32_t ZF : 1;
+            std::uint32_t SF : 1;
+            std::uint32_t TF : 1;
+            std::uint32_t IF : 1;
+            std::uint32_t DF : 1;
+            std::uint32_t OF : 1;
+            std::uint32_t IOPL : 2;
+            std::uint32_t NT : 1;
+        private:
+            std::uint32_t reserved4 : 1;
+        public:
+            std::uint32_t RF : 1;
+            std::uint32_t VM : 1;
+            std::uint32_t AC : 1;
+            std::uint32_t VIF : 1;
+            std::uint32_t VIP : 1;
+            std::uint32_t ID : 1;
+        private:
+            std::uint32_t reserved5 : 10;
+        } flags;
+    };
+    #pragma pack(pop)
+
     template<typename T>
     class kthook_simple {
         // static_assert(std::is_member_function_pointer_v<T> ||
@@ -278,6 +325,10 @@ namespace kthook {
             return last_return_address;
         }
 
+        CPU_Context* get_context() const {
+            return context;
+        }
+
         const function_ptr get_trampoline() const {
             return reinterpret_cast<const function_ptr>(trampoline_gen->getCode());
         }
@@ -315,6 +366,10 @@ namespace kthook {
             }
             else {
                 jump_gen->mov(ptr[&last_return_address], esp);
+                jump_gen->mov(esp, &context);
+                jump_gen->pushad();
+                jump_gen->mov(esp, ptr[&last_return_address]);
+                jump_gen->mov(ptr[&context.esp], esp);
                 if constexpr (function::convention != detail::traits::cconv::ccdecl) {
                     jump_gen->pop(eax);
                 }
@@ -383,6 +438,7 @@ namespace kthook {
         std::unique_ptr<Xbyak::CodeGenerator> trampoline_gen;
         std::uint64_t original;
         const std::uint8_t* relay_jump;
+        CPU_Context context;
     };
 
     template<typename T>
@@ -519,7 +575,10 @@ namespace kthook {
             return last_return_address;
         }
 
-        // DON'T USE!
+        CPU_Context* get_context() const {
+            return context;
+        }
+
         const function_ptr get_trampoline() {
             return reinterpret_cast<const function_ptr>(trampoline_gen->getCode());
         }
@@ -559,6 +618,10 @@ namespace kthook {
             }
             else {
                 jump_gen->mov(ptr[&last_return_address], esp);
+                jump_gen->mov(esp, &context);
+                jump_gen->pushad();
+                jump_gen->mov(esp, ptr[&last_return_address]);
+                jump_gen->mov(ptr[&context.esp], esp);
                 if constexpr (function::convention != detail::traits::cconv::ccdecl) {
                     jump_gen->pop(eax);
                 }
@@ -626,6 +689,7 @@ namespace kthook {
         std::unique_ptr<Xbyak::CodeGenerator> trampoline_gen;
         std::uint64_t original;
         const std::uint8_t* relay_jump;
+        CPU_Context context;
     };
 }
 
