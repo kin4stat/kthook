@@ -348,9 +348,8 @@ namespace kthook {
             if constexpr (function::convention == detail::traits::cconv::cthiscall) {
                 jump_gen->push(ecx);
             }
-#ifdef _WIN32
             jump_gen->push(reinterpret_cast<std::uintptr_t>(this));
-#else
+#ifndef _WIN32
             static_assert(function::convention != detail::traits::cconv::cfastcall, "linux fastcall not supported");
            /* if constexpr (function::convention == detail::traits::cconv::cfastcall) {
                 constexpr auto is_first_integral = detail::traits::get_register_args_count<Args>::first;
@@ -550,7 +549,6 @@ namespace kthook {
             }
             jump_gen->push(reinterpret_cast<std::uintptr_t>(this));
 #ifndef _WIN32
-            
             static_assert(function::convention != detail::traits::cconv::cfastcall, "linux fastcall not supported");
             /* if constexpr (function::convention == detail::traits::cconv::cfastcall) {
                  constexpr auto is_first_integral = detail::traits::get_register_args_count<Args>::first;
