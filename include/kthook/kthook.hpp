@@ -27,21 +27,26 @@
 #include <windows.h>
 #else
 #include <sys/mman.h>
-#include <asm/cachectl.h>
 #endif
 
 #include <optional>
 #include <functional>
 #include <type_traits>
+#include <memory>
 #include <tuple>
-#include <vector>
+#include <array>
 #include <cstdint>
 #include <cstddef>
 #include <cstring>
-#if defined(KTHOOK_64)
 
+#if defined(KTHOOK_64)
+#include "hde/hde64.h"
+#include "x86_64/kthook_x86_64_detail.hpp"
+#include "x64/kthook_detail.hpp"
+#include "x64/kthook_impl.hpp"
 #elif defined(KTHOOK_32)
 #include "hde/hde32.h"
+#include "x86_64/kthook_x86_64_detail.hpp"
 #include "x86/kthook_detail.hpp"
 #include "x86/kthook_impl.hpp"
 #endif
