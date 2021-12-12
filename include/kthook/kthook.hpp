@@ -40,17 +40,20 @@
 #include <type_traits>
 
 #if defined(KTHOOK_64)
+// clang-format off
 #include "hde/hde64.h"
+#include "x86_64/kthook_x86_64_detail.hpp"
 #include "x64/kthook_detail.hpp"
 #include "x64/kthook_impl.hpp"
-#include "x86_64/kthook_x86_64_detail.hpp"
+// clang-format on
 
 #elif defined(KTHOOK_32)
+// clang-format off
 #include "hde/hde32.h"
-#include "x86/kthook_detail.hpp"
-#include "x86/kthook_impl.hpp"
 #include "x86_64/kthook_x86_64_detail.hpp"
-
+#include "x86/kthook_detail.hpp"
+#include "x86/kthook_impl.hpp
+// clang-format on
 #endif
 
 #endif

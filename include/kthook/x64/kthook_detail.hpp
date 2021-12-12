@@ -3,13 +3,36 @@
 namespace kthook {
 namespace detail {
 namespace traits {
-template <typename T>
+template <typename Ret, typename T, typename Enable = void>
 struct count_integrals {};
 
-template <typename... Ts>
-struct count_integrals<std::tuple<Ts...>> {
-    static constexpr auto value = (std::is_integral_v<Ts> + ...) + (std::is_pointer_v<Ts> + ...);
+#ifdef KTHOOK_64_WIN
+template <typename Ret, typename... Ts>
+struct count_integrals<Ret, std::tuple<Ts...>, typename std::enable_if<std::is_void_v<Ret>>::type> {
+    static constexpr auto value = sizeof...(Ts) + ((!std::is_fundamental_v<Ts> && sizeof(Ts) <= 8) + ... + 0);
 };
+#else
+template <typename Ret, typename... Ts>
+struct count_integrals<Ret, std::tuple<Ts...>, typename std::enable_if<std::is_void_v<Ret>>::type> {
+    static constexpr auto value = (std::is_integral_v<Ts> + ...) + (std::is_pointer_v<Ts> + ...) +
+                                  ((sizeof(Ts) <= 8) + ...) + ((8 < sizeof(Ts) <= 16) + ...);
+};
+#endif
+
+#ifdef KTHOOK_64_WIN
+template <typename Ret, typename... Ts>
+struct count_integrals<Ret, std::tuple<Ts...>, typename std::enable_if<!std::is_void_v<Ret>>::type> {
+    static constexpr auto value =
+        sizeof...(Ts) + ((!std::is_fundamental_v<Ts> && sizeof(Ts) <= 8) + ... + 0) +
+        (!(std::is_trivial_v<Ret> && std::is_standard_layout_v<Ret> && (sizeof(Ret) % 2 == 0) && sizeof(Ret) <= 8));
+};
+#else
+template <typename Ret, typename... Ts>
+struct count_integrals<Ret, std::tuple<Ts...>, typename std::enable_if<!std::is_void_v<Ret>>::type> {
+    static constexpr auto value = (std::is_integral_v<Ts> + ...) + (std::is_pointer_v<Ts> + ...) +
+                                  ((sizeof(Ts) <= 8) + ...) + ((8 < sizeof(Ts) <= 16) + ...);
+};
+#endif
 
 template <typename Ret, typename Tuple>
 struct function_connect_ptr;
@@ -54,8 +77,8 @@ using function_connect_ptr_t = typename function_connect_ptr<Ret, Args...>::type
 template <class R, class... Types>
 using function_connect_t = typename function_connect<R, Types...>::type;
 
-template <typename T>
-constexpr auto count_integrals_v = count_integrals<T>::value;
+template <typename Ret, typename T>
+constexpr auto count_integrals_v = count_integrals<Ret, T>::value;
 }  // namespace traits
 
 template <typename HookType, typename Ret, typename Tuple>

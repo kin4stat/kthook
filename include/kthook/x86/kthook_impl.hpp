@@ -95,35 +95,11 @@ inline bool create_trampoline(std::uintptr_t hook_address,
             trampoline_gen->jmp(reinterpret_cast<std::uint8_t*>(current_address));
             break;
         }
-#ifdef KTHOOK_64
-        else if ((hs.modrm & 0xC7) == 0x05) {
-            // Instructions using RIP relative addressing. (ModR/M = 00???101B)
-
-            // Modify the RIP relative address.
-            std::uint32_t* pRelAddr;
-
-            std::memcpy(inst_buf, reinterpret_cast<void*>(current_address), op_copy_size);
-
-            op_copy_src = inst_buf;
-
-            // Relative address is stored at (instruction length - immediate value length - 4).
-            pRelAddr = reinterpret_cast<std::uint32_t*>(inst_buf + hs.len - ((hs.flags & 0x3C) >> 2) - 4);
-            *pRelAddr = (std::uint32_t)((current_address + hs.len + (std::int32_t)hs.disp.disp32) -
-                                        ((std::uintptr_t)(trampoline_gen->getCurr()) + hs.len));
-
-            // Complete the function if JMP (FF /4).
-            if (hs.opcode == 0xFF && hs.modrm_reg == 4) finished = true;
-        }
-#endif
         // Relative Call
         else if (hs.opcode == 0xE8) {
             std::uintptr_t call_destination = detail::restore_absolute_address(current_address, hs.imm.imm32, hs.len);
-#ifdef KTHOOK_64
-            call.address = call_destination;
-#else
             call.operand = detail::get_relative_address(
                 call_destination, reinterpret_cast<std::uintptr_t>(trampoline_gen->getCurr()), sizeof(call));
-#endif
             op_copy_src = &call;
             op_copy_size = sizeof(call);
         }
@@ -132,28 +108,20 @@ inline bool create_trampoline(std::uintptr_t hook_address,
             std::uintptr_t jmp_destination = current_address + hs.len;
 
             if (hs.opcode == 0xEB)  // is short jump
-                jmp_destination += hs.imm.imm8;
+                jmp_destination += static_cast<std::int8_t>(hs.imm.imm8);
             else
-                jmp_destination += hs.imm.imm32;
+                jmp_destination += static_cast<std::int32_t>(hs.imm.imm32);
 
             if (hook_address <= jmp_destination && jmp_destination < (hook_address + sizeof(JMP_REL))) {
                 if (max_jmp_ref < jmp_destination) max_jmp_ref = jmp_destination;
             } else {
-#ifdef KTHOOK_64
-                jmp.address = jmp_destination;
-#else
                 jmp.operand = detail::get_relative_address(
                     jmp_destination, reinterpret_cast<std::uintptr_t>(trampoline_gen->getCurr()), sizeof(jmp));
-#endif
                 op_copy_src = &jmp;
                 op_copy_size = sizeof(jmp);
 
                 // Exit the function if it is not in the branch.
-                finished = (hook_address >= max_jmp_ref)
-#ifdef KTHOOK_64
-                           && (current_address - hook_address > sizeof(call))
-#endif
-                    ;
+                finished = (hook_address >= max_jmp_ref);
             }
         }
         // Conditional relative jmp
@@ -165,9 +133,9 @@ inline bool create_trampoline(std::uintptr_t hook_address,
 
             if ((hs.opcode & 0xF0) == 0x70      // Jcc
                 || (hs.opcode & 0xFC) == 0xE0)  // LOOPNZ/LOOPZ/LOOP/JECXZ
-                jmp_destination += hs.imm.imm8;
+                jmp_destination += static_cast<std::int8_t>(hs.imm.imm8);
             else
-                jmp_destination += hs.imm.imm32;
+                jmp_destination += static_cast<std::int32_t>(hs.imm.imm32);
 
             // Simply copy an internal jump.
             if (hook_address <= jmp_destination && jmp_destination < (hook_address + sizeof(JMP_REL))) {
@@ -177,15 +145,9 @@ inline bool create_trampoline(std::uintptr_t hook_address,
                 return false;
             } else {
                 std::uint8_t cond = ((hs.opcode != 0x0F ? hs.opcode : hs.opcode2) & 0x0F);
-#ifdef KTHOOK_64
-                // Invert the condition in x64 mode to simplify the conditional jump logic.
-                jcc.opcode = 0x71 ^ cond;
-                jcc.address = jmp_destination;
-#else
                 jcc.opcode1 = 0x80 | cond;
                 jcc.operand = detail::get_relative_address(
                     jmp_destination, reinterpret_cast<std::uintptr_t>(trampoline_gen->getCurr()), sizeof(jcc));
-#endif
                 op_copy_src = &jcc;
                 op_copy_size = sizeof(jcc);
             }

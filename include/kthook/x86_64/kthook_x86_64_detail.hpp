@@ -187,7 +187,7 @@ inline std::uintptr_t get_relative_address(std::uintptr_t dest, std::uintptr_t s
     return dest - src - oplen;
 }
 inline std::uintptr_t restore_absolute_address(std::uintptr_t RIP, std::uintptr_t rel, std::size_t oplen = 5) {
-    return RIP + rel + oplen;
+    return RIP + static_cast<std::int32_t>(rel) + oplen;
 }
 
 inline bool flush_intruction_cache(const void* ptr, std::size_t size) {
@@ -203,9 +203,16 @@ inline bool check_is_executable(const void* addr) {
 #ifdef _WIN32
     MEMORY_BASIC_INFORMATION buffer;
     VirtualQuery(addr, &buffer, sizeof(buffer));
-    return buffer.Protect == PAGE_EXECUTE || buffer.Protect == PAGE_EXECUTE_READ || PAGE_EXECUTE_READWRITE;
+    return buffer.Protect == PAGE_EXECUTE || buffer.Protect == PAGE_EXECUTE_READ ||
+           buffer.Protect == PAGE_EXECUTE_READWRITE;
 #else
-    return true;
+    // POSIX HACK PON PON
+    static auto granularity = sysconf(_SC_PAGESIZE);
+    void* allocated = mmap(const_cast<void*>(addr), granularity, PROT_EXEC | PROT_READ | PROT_WRITE,
+                           MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED_NOREPLACE, 0, 0);
+    if (reinterpret_cast<std::uintptr_t>(alloc) == 0xffffffffffffffff) return true;
+    munmap(const_cast<void*>(addr), granularity);
+    return false;
 #endif
 }
 

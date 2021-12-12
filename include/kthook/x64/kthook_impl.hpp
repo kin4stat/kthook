@@ -145,9 +145,9 @@ inline bool create_trampoline(std::uintptr_t hook_address,
             std::uintptr_t jmp_destination = current_address + hs.len;
 
             if (hs.opcode == 0xEB)  // is short jump
-                jmp_destination += hs.imm.imm8;
+                jmp_destination += static_cast<std::int8_t>(hs.imm.imm8);
             else
-                jmp_destination += hs.imm.imm32;
+                jmp_destination += static_cast<std::int32_t>(hs.imm.imm32);
 
             if (hook_address <= jmp_destination && jmp_destination < (hook_address + sizeof(JMP_REL))) {
                 if (max_jmp_ref < jmp_destination) max_jmp_ref = jmp_destination;
@@ -157,7 +157,7 @@ inline bool create_trampoline(std::uintptr_t hook_address,
                 op_copy_size = sizeof(jmp);
 
                 // Exit the function if it is not in the branch.
-                finished = (hook_address >= max_jmp_ref) && (current_address - hook_address > sizeof(call));
+                finished = (hook_address >= max_jmp_ref);
             }
         }
         // Conditional relative jmp
@@ -169,9 +169,9 @@ inline bool create_trampoline(std::uintptr_t hook_address,
 
             if ((hs.opcode & 0xF0) == 0x70      // Jcc
                 || (hs.opcode & 0xFC) == 0xE0)  // LOOPNZ/LOOPZ/LOOP/JECXZ
-                jmp_destination += hs.imm.imm8;
+                jmp_destination += static_cast<std::int8_t>(hs.imm.imm8);
             else
-                jmp_destination += hs.imm.imm32;
+                jmp_destination += static_cast<std::int32_t>(hs.imm.imm32);
 
             // Simply copy an internal jump.
             if (hook_address <= jmp_destination && jmp_destination < (hook_address + sizeof(JMP_REL))) {
@@ -323,6 +323,7 @@ private:
         jump_gen->mov(ptr[reinterpret_cast<std::uintptr_t>(&context.rax)], rax);
         jump_gen->mov(rax, rsp);
         jump_gen->mov(ptr[reinterpret_cast<std::uintptr_t>(&last_return_address)], rax);
+        jump_gen->mov(rax, ptr[reinterpret_cast<std::uintptr_t>(&context.rax)]);
         if constexpr (create_context) {
             jump_gen->mov(rsp, reinterpret_cast<std::uintptr_t>(&context.align));
             jump_gen->pushfq();
@@ -348,19 +349,19 @@ private:
 
 #if defined(KTHOOK_64_WIN)
         constexpr std::array registers{rcx, rdx, r8, r9};
-        constexpr auto last_integral = function::args_count;
+        constexpr auto last_integral = detail::traits::count_integrals_v<Ret, Args>;
 #elif defined(KTHOOK_64_GCC)
         constexpr std::array registers{rdi, rsi, rdx, rcx, r8, r9};
-        constexpr auto last_integral = detail::traits::count_integrals_v<Args>;
+        constexpr auto last_integral = detail::traits::count_integrals_v<Ret, Args>;
 #endif
         if constexpr (registers.size() <= last_integral) {
             jump_gen->mov(rax, rcx);
-            jump_gen->mov(ptr[&context.rcx], rax);
+            jump_gen->mov(ptr[reinterpret_cast<std::uintptr_t>(&context.rcx)], rax);
             jump_gen->pop(rax);
             jump_gen->mov(rcx, reinterpret_cast<std::uintptr_t>(this));
             jump_gen->push(rcx);
             jump_gen->push(rax);
-            jump_gen->mov(rax, ptr[&context.rcx]);
+            jump_gen->mov(rax, ptr[reinterpret_cast<std::uintptr_t>(&context.rcx)]);
             jump_gen->mov(rcx, rax);
         } else {
             jump_gen->mov(registers[last_integral], reinterpret_cast<std::uintptr_t>(this));
@@ -523,6 +524,7 @@ private:
         jump_gen->mov(ptr[reinterpret_cast<std::uintptr_t>(&context.rax)], rax);
         jump_gen->mov(rax, rsp);
         jump_gen->mov(ptr[reinterpret_cast<std::uintptr_t>(&last_return_address)], rax);
+        jump_gen->mov(rax, ptr[reinterpret_cast<std::uintptr_t>(&context.rax)]);
         if constexpr (create_context) {
             jump_gen->mov(rsp, reinterpret_cast<std::uintptr_t>(&context.align));
             jump_gen->pushfq();
@@ -548,19 +550,19 @@ private:
 
 #if defined(KTHOOK_64_WIN)
         constexpr std::array registers{rcx, rdx, r8, r9};
-        constexpr auto last_integral = function::args_count;
+        constexpr auto last_integral = detail::traits::count_integrals_v<Ret, Args>;
 #elif defined(KTHOOK_64_GCC)
         constexpr std::array registers{rdi, rsi, rdx, rcx, r8, r9};
-        constexpr auto last_integral = detail::traits::count_integrals_v<Args>;
+        constexpr auto last_integral = detail::traits::count_integrals_v<Ret, Args>;
 #endif
         if constexpr (registers.size() <= last_integral) {
             jump_gen->mov(rax, rcx);
-            jump_gen->mov(ptr[&context.rcx], rax);
+            jump_gen->mov(ptr[reinterpret_cast<std::uintptr_t>(&context.rcx)], rax);
             jump_gen->pop(rax);
             jump_gen->mov(rcx, reinterpret_cast<std::uintptr_t>(this));
             jump_gen->push(rcx);
             jump_gen->push(rax);
-            jump_gen->mov(rax, ptr[&context.rcx]);
+            jump_gen->mov(rax, ptr[reinterpret_cast<std::uintptr_t>(&context.rcx)]);
             jump_gen->mov(rcx, rax);
         } else {
             jump_gen->mov(registers[last_integral], reinterpret_cast<std::uintptr_t>(this));
