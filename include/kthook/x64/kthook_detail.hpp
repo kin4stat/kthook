@@ -9,7 +9,7 @@ struct count_integrals {};
 #ifdef KTHOOK_64_WIN
 template <typename Ret, typename... Ts>
 struct count_integrals<Ret, std::tuple<Ts...>, typename std::enable_if<std::is_void_v<Ret>>::type> {
-    static constexpr auto value = sizeof...(Ts) + ((!std::is_fundamental_v<Ts> && sizeof(Ts) <= 8) + ... + 0);
+    static constexpr auto value = sizeof...(Ts);
 };
 #else
 template <typename Ret, typename... Ts>
@@ -22,9 +22,8 @@ struct count_integrals<Ret, std::tuple<Ts...>, typename std::enable_if<std::is_v
 #ifdef KTHOOK_64_WIN
 template <typename Ret, typename... Ts>
 struct count_integrals<Ret, std::tuple<Ts...>, typename std::enable_if<!std::is_void_v<Ret>>::type> {
-    static constexpr auto value =
-        sizeof...(Ts) + ((!std::is_fundamental_v<Ts> && sizeof(Ts) <= 8) + ... + 0) +
-        (!(std::is_trivial_v<Ret> && std::is_standard_layout_v<Ret> && (sizeof(Ret) % 2 == 0) && sizeof(Ret) <= 8));
+    static constexpr auto value = sizeof...(Ts) + (!(std::is_trivial_v<Ret> && std::is_standard_layout_v<Ret> &&
+                                                     (sizeof(Ret) % 2 == 0) && sizeof(Ret) <= 8));
 };
 #else
 template <typename Ret, typename... Ts>
