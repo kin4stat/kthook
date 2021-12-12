@@ -1,1 +1,3 @@
 .vscode
+/.vs
+/out/build/windows-default

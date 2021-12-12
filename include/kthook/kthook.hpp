@@ -39,7 +39,6 @@
 #include <tuple>
 #include <type_traits>
 
-
 #if defined(KTHOOK_64)
 #include "hde/hde64.h"
 #include "x64/kthook_detail.hpp"
