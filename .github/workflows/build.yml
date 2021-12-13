@@ -37,20 +37,36 @@ jobs:
       with:
         submodules: recursive
 
-    - name: Configure CMake
-      # Configure CMake in a 'build' subdirectory. `CMAKE_BUILD_TYPE` is only required if you are using a single-configuration generator such as make.
-      # See https://cmake.org/cmake/help/latest/variable/CMAKE_BUILD_TYPE.html?highlight=cmake_build_type
-      run: cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{matrix.build_type}} ${{matrix.defs}} 
+    - name: "Checkout build-actions"
+      run: git clone https://github.com/build-actions/build-actions.git build-actions --depth=1
 
-    - name: Build
-      # Build your program with the given configuration
-      run: cmake --build ${{github.workspace}}/build --config ${{matrix.build_type}}
+    - name: "Python"
+      uses: actions/setup-python@v2
+      with:
+        python-version: "3.x"
 
-    - name: Test
-      working-directory: ${{github.workspace}}/build
-      # Execute tests defined by the CMake configuration.  
-      # See https://cmake.org/cmake/help/latest/manual/ctest.1.html for more detail
-      run: ctest -C ${{matrix.build_type}}
+    - name: "Prepare"
+      run: python build-actions/action.py
+                  --step=prepare
+                  --compiler=${{matrix.cc}}
+                  --diagnostics=${{matrix.diagnostics}}
+                  --architecture=${{matrix.arch}}
+
+    - name: "Configure"
+      run: python build-actions/action.py
+                  --step=configure
+                  --config=source/.github/workflows/build-config.json
+                  --source-dir=source
+                  --compiler=${{matrix.cc}}
+                  --architecture=${{matrix.arch}}
+                  --build-type=${{matrix.build_type}}
+                  --build-defs=${{matrix.defs}}
+
+    - name: "Build"
+      run: python build-actions/action.py --step=build
+
+    - name: "Test"
+      run: python build-actions/action.py --step=test
   formatting-check:
     name: Formatting Check
     runs-on: ubuntu-latest
