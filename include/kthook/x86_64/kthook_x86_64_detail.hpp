@@ -206,13 +206,15 @@ inline bool check_is_executable(const void* addr) {
     return buffer.Protect == PAGE_EXECUTE || buffer.Protect == PAGE_EXECUTE_READ ||
            buffer.Protect == PAGE_EXECUTE_READWRITE;
 #else
-    // POSIX HACK PON PON
-    static auto granularity = sysconf(_SC_PAGESIZE);
-    void* allocated = mmap(const_cast<void*>(addr), granularity, PROT_EXEC | PROT_READ | PROT_WRITE,
-                           MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED_NOREPLACE, 0, 0);
-    if (reinterpret_cast<std::uintptr_t>(allocated) == 0xffffffffffffffff) return false;
-    munmap(const_cast<void*>(addr), granularity);
     return true;
+    // POSIX HACK PON PON
+    /* static auto granularity = sysconf(_SC_PAGESIZE);
+     void* allocated = mmap(const_cast<void*>(addr), granularity, PROT_EXEC | PROT_READ | PROT_WRITE,
+     void* allocated = mmap(const_cast<void*>(addr), granularity, PROT_EXEC | PROT_READ | PROT_WRITE,
+                            MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED_NOREPLACE, 0, 0);
+     if (reinterpret_cast<std::uintptr_t>(allocated) == 0xffffffffffffffff) return false;
+     munmap(const_cast<void*>(addr), granularity);
+     return true;*/
 #endif
 }
 

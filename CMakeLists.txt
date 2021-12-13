@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.0)
 project(kthook)
 
-option(KTHOOK_TEST "Build with tests" OFF)
+option(KTHOOK_TEST "Build with tests" ON)
 
 if (NOT DEFINED KTHOOK_TEST)
   set(KTHOOK_TEST FALSE)
