@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.0)
 project(kthook)
 
-option(KTHOOK_TEST "Build this target with AddressSanitizer" ON)
+option(KTHOOK_TEST "Build with tests" OFF)
 
 if (NOT DEFINED KTHOOK_TEST)
   set(KTHOOK_TEST FALSE)
@@ -66,6 +66,7 @@ if(KTHOOK_TEST)
         URL https://github.com/google/googletest/archive/e2239ee6043f73722e7aa812a459f54a28552929.zip
     )
     # For Windows: Prevent overriding the parent project's compiler/linker settings
+    set(gtest_disable_pthreads ON)
     set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
     FetchContent_MakeAvailable(googletest)
     include(GoogleTest)

@@ -264,7 +264,7 @@ struct JumpAllocator : Xbyak::Allocator {
         set_memory_prot(ptr, size, MemoryProt::PROTECT_RWE);
         return reinterpret_cast<uint8_t*>(ptr);
     }
-    virtual void free(uint8_t* p) { }
+    virtual void free(uint8_t* p) {}
     virtual bool useProtect() const { return false; }
 } default_jmp_allocator;
 }  // namespace detail

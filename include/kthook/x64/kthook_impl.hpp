@@ -241,8 +241,8 @@ public:
     kthook_simple(std::uintptr_t destination, cb_type callback_, bool force_enable = true)
         : callback(std::move(callback_)),
           info(destination, nullptr),
-          jump_gen(std::make_unique<Xbyak::CodeGenerator>(Xbyak::DEFAULT_MAX_CODE_SIZE,
-                                                          detail::try_alloc_near(destination), &detail::default_jmp_allocator)) {
+          jump_gen(std::make_unique<Xbyak::CodeGenerator>(
+              Xbyak::DEFAULT_MAX_CODE_SIZE, detail::try_alloc_near(destination), &detail::default_jmp_allocator)) {
         if (force_enable) {
             install();
         }
@@ -250,8 +250,8 @@ public:
 
     kthook_simple(std::uintptr_t destination)
         : info(destination, nullptr),
-          jump_gen(std::make_unique<Xbyak::CodeGenerator>(Xbyak::DEFAULT_MAX_CODE_SIZE,
-                                                          detail::try_alloc_near(destination), &detail::default_jmp_allocator)) {}
+          jump_gen(std::make_unique<Xbyak::CodeGenerator>(
+              Xbyak::DEFAULT_MAX_CODE_SIZE, detail::try_alloc_near(destination), &detail::default_jmp_allocator)) {}
 
     kthook_simple(void* destination) : kthook_simple(reinterpret_cast<std::uintptr_t>(destination)) {}
 
@@ -288,8 +288,8 @@ public:
     void set_cb(cb_type callback_) { callback = std::move(callback_); }
 
     void set_dest(std::uintptr_t address) {
-        jump_gen =
-            std::make_unique<Xbyak::CodeGenerator>(Xbyak::DEFAULT_MAX_CODE_SIZE, detail::try_alloc_near(address), &detail::default_jmp_allocator);
+        jump_gen = std::make_unique<Xbyak::CodeGenerator>(Xbyak::DEFAULT_MAX_CODE_SIZE, detail::try_alloc_near(address),
+                                                          &detail::default_jmp_allocator);
         info = {address, nullptr};
     }
 
@@ -452,8 +452,8 @@ public:
 
     kthook_signal(std::uintptr_t destination, bool force_enable = true)
         : info(destination, nullptr),
-          jump_gen(std::make_unique<Xbyak::CodeGenerator>(Xbyak::DEFAULT_MAX_CODE_SIZE,
-                                                          detail::try_alloc_near(destination), &detail::default_jmp_allocator)) {
+          jump_gen(std::make_unique<Xbyak::CodeGenerator>(
+              Xbyak::DEFAULT_MAX_CODE_SIZE, detail::try_alloc_near(destination), &detail::default_jmp_allocator)) {
         if (force_enable) {
             install();
         }
@@ -491,8 +491,8 @@ public:
 
     void set_dest(std::uintptr_t address) {
         info = {address, nullptr};
-        jump_gen =
-            std::make_unique<Xbyak::CodeGenerator>(Xbyak::DEFAULT_MAX_CODE_SIZE, detail::try_alloc_near(address), &detail::default_jmp_allocator);
+        jump_gen = std::make_unique<Xbyak::CodeGenerator>(Xbyak::DEFAULT_MAX_CODE_SIZE, detail::try_alloc_near(address),
+                                                          &detail::default_jmp_allocator);
     }
 
     void set_dest(void* address) { set_dest(reinterpret_cast<std::uintptr_t>(address)); }

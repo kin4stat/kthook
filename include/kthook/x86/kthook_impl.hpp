@@ -62,7 +62,9 @@ struct CPU_Context {
 #pragma pack(pop)
 
 namespace detail {
-    struct CPU_Context_empty { std::uintptr_t ecx; };
+struct CPU_Context_empty {
+    std::uintptr_t ecx;
+};
 
 inline bool create_trampoline(std::uintptr_t hook_address,
                               const std::unique_ptr<Xbyak::CodeGenerator>& trampoline_gen) {
@@ -326,7 +328,7 @@ private:
              jump_gen->push(reinterpret_cast<std::uintptr_t>(this));
          }*/
 #else
-        
+
 #endif
         void* relay_ptr =
             reinterpret_cast<void*>(&detail::relay_generator<kthook_simple, function::convention, Ret, Args>::relay);
@@ -386,7 +388,8 @@ private:
     hook_info info;
     std::uintptr_t* last_return_address{nullptr};
     std::size_t hook_size{0};
-    std::unique_ptr<Xbyak::CodeGenerator> jump_gen{std::make_unique<Xbyak::CodeGenerator>(Xbyak::DEFAULT_MAX_CODE_SIZE, nullptr, &detail::default_jmp_allocator)};
+    std::unique_ptr<Xbyak::CodeGenerator> jump_gen{
+        std::make_unique<Xbyak::CodeGenerator>(Xbyak::DEFAULT_MAX_CODE_SIZE, nullptr, &detail::default_jmp_allocator)};
     std::unique_ptr<Xbyak::CodeGenerator> trampoline_gen{std::make_unique<Xbyak::CodeGenerator>()};
     std::uint64_t original{0};
     const std::uint8_t* relay_jump{nullptr};
@@ -533,8 +536,8 @@ private:
              jump_gen->push(reinterpret_cast<std::uintptr_t>(this));
          }*/
 #endif
-        void* relay_ptr =
-            reinterpret_cast<void*>(&detail::signal_relay_generator<kthook_signal, function::convention, Ret, Args>::relay);
+        void* relay_ptr = reinterpret_cast<void*>(
+            &detail::signal_relay_generator<kthook_signal, function::convention, Ret, Args>::relay);
         if constexpr (function::convention == detail::traits::cconv::ccdecl) {
             jump_gen->call(relay_ptr);
             jump_gen->add(esp, 4);
@@ -590,7 +593,8 @@ private:
     hook_info info;
     std::uintptr_t* last_return_address = nullptr;
     std::size_t hook_size = 0;
-    std::unique_ptr<Xbyak::CodeGenerator> jump_gen{std::make_unique<Xbyak::CodeGenerator>(Xbyak::DEFAULT_MAX_CODE_SIZE, nullptr, &detail::default_jmp_allocator)};
+    std::unique_ptr<Xbyak::CodeGenerator> jump_gen{
+        std::make_unique<Xbyak::CodeGenerator>(Xbyak::DEFAULT_MAX_CODE_SIZE, nullptr, &detail::default_jmp_allocator)};
     std::unique_ptr<Xbyak::CodeGenerator> trampoline_gen{std::make_unique<Xbyak::CodeGenerator>()};
     std::uint64_t original = 0;
     const std::uint8_t* relay_jump = nullptr;
