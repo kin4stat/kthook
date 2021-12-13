@@ -62,7 +62,7 @@ struct CPU_Context {
 #pragma pack(pop)
 
 namespace detail {
-struct CPU_Context_empty {};
+    struct CPU_Context_empty { std::uintptr_t ecx; };
 
 inline bool create_trampoline(std::uintptr_t hook_address,
                               const std::unique_ptr<Xbyak::CodeGenerator>& trampoline_gen) {
@@ -281,7 +281,7 @@ private:
             jump_gen->pushfd();
             jump_gen->pushad();
             jump_gen->mov(esp, ptr[&last_return_address]);
-            jump_gen->mov(ptr[&context.esp], esp);
+            jump_gen->mov(ptr[reinterpret_cast<std::uintptr_t>(&context.esp)], esp);
         }
         if constexpr (function::convention != detail::traits::cconv::ccdecl) {
             jump_gen->pop(eax);
@@ -289,7 +289,19 @@ private:
         if constexpr (function::convention == detail::traits::cconv::cthiscall) {
             jump_gen->push(ecx);
         }
+        if constexpr (!std::is_void_v<Ret>) {
+            if constexpr (sizeof(Ret) > 8) {
+                jump_gen->mov(ptr[reinterpret_cast<std::uintptr_t>(&context.ecx)], ecx);
+                jump_gen->pop(ecx);
+            }
+        }
         jump_gen->push(reinterpret_cast<std::uintptr_t>(this));
+        if constexpr (!std::is_void_v<Ret>) {
+            if constexpr (sizeof(Ret) > 8) {
+                jump_gen->push(ecx);
+                jump_gen->mov(ecx, ptr[reinterpret_cast<std::uintptr_t>(&context.ecx)]);
+            }
+        }
 #ifndef _WIN32
         static_assert(function::convention != detail::traits::cconv::cfastcall, "linux fastcall not supported");
         /* if constexpr (function::convention == detail::traits::cconv::cfastcall) {
@@ -313,6 +325,8 @@ private:
              }
              jump_gen->push(reinterpret_cast<std::uintptr_t>(this));
          }*/
+#else
+        
 #endif
         void* relay_ptr =
             reinterpret_cast<void*>(&detail::relay_generator<kthook_simple, function::convention, Ret, Args>::relay);
@@ -372,7 +386,7 @@ private:
     hook_info info;
     std::uintptr_t* last_return_address{nullptr};
     std::size_t hook_size{0};
-    std::unique_ptr<Xbyak::CodeGenerator> jump_gen{std::make_unique<Xbyak::CodeGenerator>()};
+    std::unique_ptr<Xbyak::CodeGenerator> jump_gen{std::make_unique<Xbyak::CodeGenerator>(Xbyak::DEFAULT_MAX_CODE_SIZE, nullptr, &detail::default_jmp_allocator)};
     std::unique_ptr<Xbyak::CodeGenerator> trampoline_gen{std::make_unique<Xbyak::CodeGenerator>()};
     std::uint64_t original{0};
     const std::uint8_t* relay_jump{nullptr};
@@ -482,7 +496,19 @@ private:
         if constexpr (function::convention == detail::traits::cconv::cthiscall) {
             jump_gen->push(ecx);
         }
+        if constexpr (!std::is_void_v<Ret>) {
+            if constexpr (sizeof(Ret) > 8) {
+                jump_gen->mov(ptr[reinterpret_cast<std::uintptr_t>(&context.ecx)], ecx);
+                jump_gen->pop(ecx);
+            }
+        }
         jump_gen->push(reinterpret_cast<std::uintptr_t>(this));
+        if constexpr (!std::is_void_v<Ret>) {
+            if constexpr (sizeof(Ret) > 8) {
+                jump_gen->push(ecx);
+                jump_gen->mov(ecx, ptr[reinterpret_cast<std::uintptr_t>(&context.ecx)]);
+            }
+        }
 #ifndef _WIN32
         static_assert(function::convention != detail::traits::cconv::cfastcall, "linux fastcall not supported");
         /* if constexpr (function::convention == detail::traits::cconv::cfastcall) {
@@ -508,7 +534,7 @@ private:
          }*/
 #endif
         void* relay_ptr =
-            reinterpret_cast<void*>(&detail::relay_generator<kthook_simple, function::convention, Ret, Args>::relay);
+            reinterpret_cast<void*>(&detail::signal_relay_generator<kthook_signal, function::convention, Ret, Args>::relay);
         if constexpr (function::convention == detail::traits::cconv::ccdecl) {
             jump_gen->call(relay_ptr);
             jump_gen->add(esp, 4);
@@ -564,7 +590,7 @@ private:
     hook_info info;
     std::uintptr_t* last_return_address = nullptr;
     std::size_t hook_size = 0;
-    std::unique_ptr<Xbyak::CodeGenerator> jump_gen{std::make_unique<Xbyak::CodeGenerator>()};
+    std::unique_ptr<Xbyak::CodeGenerator> jump_gen{std::make_unique<Xbyak::CodeGenerator>(Xbyak::DEFAULT_MAX_CODE_SIZE, nullptr, &detail::default_jmp_allocator)};
     std::unique_ptr<Xbyak::CodeGenerator> trampoline_gen{std::make_unique<Xbyak::CodeGenerator>()};
     std::uint64_t original = 0;
     const std::uint8_t* relay_jump = nullptr;

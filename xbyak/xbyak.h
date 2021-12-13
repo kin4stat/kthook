@@ -1047,7 +1047,7 @@ public:
 	{
 		if (isAllocType()) {
 			if (useProtect()) setProtectModeRW(false);
-			//alloc_->free(top_);
+			alloc_->free(top_);
 		}
 	}
 	bool setProtectMode(ProtectMode mode, bool throwException = true)

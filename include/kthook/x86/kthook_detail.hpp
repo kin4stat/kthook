@@ -113,13 +113,6 @@ struct function_traits<Ret(CFASTCALL*)(Args...)> {
     using args = std::tuple<Args...>;
     using return_type = Ret;
 };
-template <typename T, typename Tuple>
-struct tuple_cat;
-
-template <typename T, typename... Ts>
-struct tuple_cat<T, std::tuple<Ts...>> {
-    using type = std::tuple<T, Ts...>;
-};
 
 template <cconv Conv, typename Ret, typename... Args>
 using function_connect_ptr_t = typename function_connect_ptr<Conv, Ret, Args...>::type;

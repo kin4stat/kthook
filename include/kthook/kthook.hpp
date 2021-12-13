@@ -52,7 +52,7 @@
 #include "hde/hde32.h"
 #include "x86_64/kthook_x86_64_detail.hpp"
 #include "x86/kthook_detail.hpp"
-#include "x86/kthook_impl.hpp
+#include "x86/kthook_impl.hpp"
 // clang-format on
 #endif
 
