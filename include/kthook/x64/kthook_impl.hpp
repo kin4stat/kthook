@@ -239,33 +239,31 @@ public:
     kthook_simple() : info(0, nullptr) {}
 
     kthook_simple(std::uintptr_t destination, cb_type callback_, bool force_enable = true)
-        : callback(std::move(callback_)),
-          info(destination, nullptr),
-          jump_gen(std::make_unique<Xbyak::CodeGenerator>(
-              Xbyak::DEFAULT_MAX_CODE_SIZE, detail::try_alloc_near(destination), &detail::default_jmp_allocator)) {
+        : callback(std::move(callback_)), info(destination, nullptr) {
         if (force_enable) {
             install();
         }
     }
 
-    kthook_simple(std::uintptr_t destination)
-        : info(destination, nullptr),
-          jump_gen(std::make_unique<Xbyak::CodeGenerator>(
-              Xbyak::DEFAULT_MAX_CODE_SIZE, detail::try_alloc_near(destination), &detail::default_jmp_allocator)) {}
+    kthook_simple(std::uintptr_t destination) : info(destination, nullptr) {}
 
     kthook_simple(void* destination) : kthook_simple(reinterpret_cast<std::uintptr_t>(destination)) {}
+
+    kthook_simple(function_ptr destination) : kthook_simple(reinterpret_cast<std::uintptr_t>(destination)) {}
 
     kthook_simple(void* destination, cb_type callback, bool force_enable = true)
         : kthook_simple(reinterpret_cast<std::uintptr_t>(destination), callback, force_enable) {}
 
     template <typename Ptr>
-    kthook_simple(Ptr* destination, cb_type callback_, bool force_enable = true)
+    kthook_simple(function_ptr destination, cb_type callback_, bool force_enable = true)
         : kthook_simple(reinterpret_cast<void*>(destination), callback_, force_enable) {}
 
     ~kthook_simple() { remove(); }
 
     bool install() {
         if (!detail::check_is_executable(reinterpret_cast<void*>(info.hook_address))) return false;
+        jump_gen = std::make_unique<Xbyak::CodeGenerator>(
+            Xbyak::DEFAULT_MAX_CODE_SIZE, detail::try_alloc_near(info.hook_address), &detail::default_jmp_allocator);
         if (!detail::create_trampoline(info.hook_address, trampoline_gen)) return false;
         if (!detail::flush_intruction_cache(trampoline_gen->getCode(), trampoline_gen->getSize())) return false;
         if (!patch_hook(true)) return false;
@@ -287,11 +285,7 @@ public:
 
     void set_cb(cb_type callback_) { callback = std::move(callback_); }
 
-    void set_dest(std::uintptr_t address) {
-        jump_gen = std::make_unique<Xbyak::CodeGenerator>(Xbyak::DEFAULT_MAX_CODE_SIZE, detail::try_alloc_near(address),
-                                                          &detail::default_jmp_allocator);
-        info = {address, nullptr};
-    }
+    void set_dest(std::uintptr_t address) { info = {address, nullptr}; }
 
     void set_dest(void* address) { set_dest(reinterpret_cast<std::uintptr_t>(address)); }
 
@@ -410,7 +404,8 @@ private:
             std::memcpy(reinterpret_cast<void*>(&original), relay_jump, sizeof(original));
             jump_gen->rewrite(0, 0x9090909090909090, 8);
         }
-        detail::flush_intruction_cache(relay_jump, jump_gen->getSize());
+        if (jump_gen.get())
+            detail::flush_intruction_cache(relay_jump, jump_gen->getSize());
         return true;
     }
 
@@ -450,10 +445,7 @@ class kthook_signal {
 public:
     kthook_signal() : info(0, nullptr) {}
 
-    kthook_signal(std::uintptr_t destination, bool force_enable = true)
-        : info(destination, nullptr),
-          jump_gen(std::make_unique<Xbyak::CodeGenerator>(
-              Xbyak::DEFAULT_MAX_CODE_SIZE, detail::try_alloc_near(destination), &detail::default_jmp_allocator)) {
+    kthook_signal(std::uintptr_t destination, bool force_enable = true) : info(destination, nullptr) {
         if (force_enable) {
             install();
         }
@@ -462,8 +454,7 @@ public:
     kthook_signal(void* destination, bool force_enable = true)
         : kthook_signal(reinterpret_cast<std::uintptr_t>(destination), force_enable) {}
 
-    template <typename Ptr>
-    kthook_signal(Ptr* destination, bool force_enable = true)
+    kthook_signal(function_ptr destination, bool force_enable = true)
         : kthook_signal(reinterpret_cast<void*>(destination), force_enable) {}
 
     ~kthook_signal() { remove(); }
@@ -471,6 +462,8 @@ public:
     bool install() {
         if (info.hook_address == 0) return false;
         if (!detail::check_is_executable(reinterpret_cast<void*>(info.hook_address))) return false;
+        jump_gen = std::make_unique<Xbyak::CodeGenerator>(
+            Xbyak::DEFAULT_MAX_CODE_SIZE, detail::try_alloc_near(info.hook_address), &detail::default_jmp_allocator);
         if (!detail::create_trampoline(info.hook_address, trampoline_gen)) return false;
         if (!detail::flush_intruction_cache(trampoline_gen->getCode(), trampoline_gen->getSize())) return false;
         if (!patch_hook(true)) return false;
@@ -489,11 +482,7 @@ public:
             return false;
     }
 
-    void set_dest(std::uintptr_t address) {
-        info = {address, nullptr};
-        jump_gen = std::make_unique<Xbyak::CodeGenerator>(Xbyak::DEFAULT_MAX_CODE_SIZE, detail::try_alloc_near(address),
-                                                          &detail::default_jmp_allocator);
-    }
+    void set_dest(std::uintptr_t address) { info = {address, nullptr}; }
 
     void set_dest(void* address) { set_dest(reinterpret_cast<std::uintptr_t>(address)); }
 
@@ -611,7 +600,8 @@ private:
             std::memcpy(reinterpret_cast<void*>(&original), relay_jump, sizeof(original));
             jump_gen->rewrite(0, 0x9090909090909090, 8);
         }
-        detail::flush_intruction_cache(relay_jump, jump_gen->getSize());
+        if (jump_gen.get())
+            detail::flush_intruction_cache(relay_jump, jump_gen->getSize());
         return true;
     }
 

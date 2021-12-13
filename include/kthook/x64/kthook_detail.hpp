@@ -14,8 +14,7 @@ struct count_integrals<Ret, std::tuple<Ts...>, typename std::enable_if<std::is_v
 #else
 template <typename Ret, typename... Ts>
 struct count_integrals<Ret, std::tuple<Ts...>, typename std::enable_if<std::is_void_v<Ret>>::type> {
-    static constexpr auto value = (std::is_integral_v<Ts> + ...) + (std::is_pointer_v<Ts> + ...) +
-                                  ((sizeof(Ts) <= 8) + ...) + ((8 < sizeof(Ts) <= 16) + ...);
+    static constexpr auto value = (std::is_integral_v<Ts> + ... + 0) + (std::is_pointer_v<Ts> + ... + 0);
 };
 #endif
 
@@ -28,8 +27,7 @@ struct count_integrals<Ret, std::tuple<Ts...>, typename std::enable_if<!std::is_
 #else
 template <typename Ret, typename... Ts>
 struct count_integrals<Ret, std::tuple<Ts...>, typename std::enable_if<!std::is_void_v<Ret>>::type> {
-    static constexpr auto value = (std::is_integral_v<Ts> + ...) + (std::is_pointer_v<Ts> + ...) +
-                                  ((sizeof(Ts) <= 8) + ...) + ((8 < sizeof(Ts) <= 16) + ...);
+    static constexpr auto value = (std::is_integral_v<Ts> + ... + 0) + (std::is_pointer_v<Ts> + ... + 0);
 };
 #endif
 

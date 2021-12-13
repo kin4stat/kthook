@@ -210,9 +210,9 @@ inline bool check_is_executable(const void* addr) {
     static auto granularity = sysconf(_SC_PAGESIZE);
     void* allocated = mmap(const_cast<void*>(addr), granularity, PROT_EXEC | PROT_READ | PROT_WRITE,
                            MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED_NOREPLACE, 0, 0);
-    if (reinterpret_cast<std::uintptr_t>(alloc) == 0xffffffffffffffff) return true;
+    if (reinterpret_cast<std::uintptr_t>(allocated) == 0xffffffffffffffff) return false;
     munmap(const_cast<void*>(addr), granularity);
-    return false;
+    return true;
 #endif
 }
 
