@@ -1,6 +1,4 @@
 {
-  "diagnostics": {},
-
   "tests": [
     {
       "cmd": ["aggregates_test"],
@@ -17,6 +15,6 @@
     {
       "cmd": ["simple_test"],
       "optional": true
-    },
+    }
   ]
 }
