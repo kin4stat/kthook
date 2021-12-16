@@ -1,15 +1,18 @@
 #include "gtest/gtest.h"
 #include "kthook/kthook.hpp"
+#include "test_common.hpp"
 
 constexpr int return_default = 10;
 constexpr int test_val = 5;
 
-int
+DECLARE_SIZE_ENLARGER();
+
+int NO_OPTIMIZE
 #ifdef KTHOOK_32
     TEST_CCONV
 #endif
     test_func(int value) {
-
+    SIZE_ENLARGER();
     return value;
 }
 

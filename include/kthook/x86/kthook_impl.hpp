@@ -264,9 +264,9 @@ public:
         return reinterpret_cast<const function_ptr>(trampoline_gen->getCode());
     }
 
-private:
     cb_type& get_callback() { return callback; }
 
+private:
     const std::uint8_t* generate_relay_jump() {
         using namespace Xbyak::util;
 

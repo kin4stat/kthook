@@ -1,5 +1,6 @@
 #include "gtest/gtest.h"
 #include "kthook/kthook.hpp"
+#include "test_common.hpp"
 
 constexpr std::tuple<int, float, long long, double, short, char, int, long double, float, int, int, long, long long,
                      int, int, int>
@@ -30,38 +31,52 @@ testing::AssertionResult check_equality(decltype(test_args) rhs) {
     return testing::AssertionSuccess() << "args are equal";
 }
 
+DECLARE_SIZE_ENLARGER();
+
 #undef EQUALITY_CHECK
 
-void
+void NO_OPTIMIZE
 #ifdef KTHOOK_32
     TEST_CCONV
 #endif
     test_func(int v1, float v2, long long v3, double v4, short v5, char v6, int v7, long double v8, float v9, int v10,
               int v11, long v12, long long v13, int v14, int v15, int v16) {
+    SIZE_ENLARGER();
 }
 
 TEST(KthookSimpleLotsArgsTest, HandlesKthookSimple) {
     kthook::kthook_simple<decltype(&test_func)> hook{&test_func};
     hook.install();
 
-    hook.set_cb([](const auto& hook, auto&&... args) {
+    int counter = 0;
+    hook.set_cb([&counter](const auto& hook, auto&&... args) {
         EXPECT_TRUE(check_equality(decltype(test_args){args...}));
+        ++counter;
         hook.get_trampoline()(args...);
     });
     std::apply(&test_func, test_args);
+    EXPECT_EQ(counter, 1);
 }
 
 TEST(KthookSignalLotsArgsTest, HandlesKthookSignalBefore) {
     kthook::kthook_signal<decltype(&test_func)> hook{&test_func};
-    hook.before += [](const auto& hook, auto&&... args) {
+    int counter = 0;
+    hook.before += [&counter](const auto& hook, auto&&... args) {
         EXPECT_TRUE(check_equality(decltype(test_args){args...}));
+        ++counter;
         return true;
     };
     std::apply(&test_func, test_args);
+    EXPECT_EQ(counter, 1);
 }
 
 TEST(KthookSignalLotsArgsTest, HandlesKthookSignalAfter) {
     kthook::kthook_signal<decltype(&test_func)> hook{&test_func};
-    hook.after += [](const auto& hook, auto&&... args) { EXPECT_TRUE(check_equality(decltype(test_args){args...})); };
+    int counter = 0;
+    hook.after += [&counter](const auto& hook, auto&&... args) {
+        EXPECT_TRUE(check_equality(decltype(test_args){args...}));
+        ++counter;
+    };
     std::apply(&test_func, test_args);
+    EXPECT_EQ(counter, 1);
 }

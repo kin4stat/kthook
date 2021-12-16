@@ -110,19 +110,19 @@ inline Ret signal_relay(HookPtrType* this_hook, Args&... args) {
     } else {
         auto before_iterate = this_hook->before.emit_iterate(*this_hook, args...);
         bool dont_skip_original = true;
-        Ret value{};
+        std::optional<Ret> value;
         for (std::optional<Ret> return_value : before_iterate) {
             bool has_value = return_value.has_value();
             dont_skip_original &= !has_value;
             if (has_value) {
-                value = return_value.value();
+                value = std::move(return_value.value());
             }
         }
         if (dont_skip_original) {
             value = std::move(this_hook->get_trampoline()(args...));
-            this_hook->after.emit(*this_hook, value, args...);
+            this_hook->after.emit(*this_hook, value.value(), args...);
         }
-        return value;
+        return value.value();
     }
 }
 
@@ -269,6 +269,15 @@ struct JumpAllocator : Xbyak::Allocator {
     virtual void free(uint8_t* p) {}
     virtual bool useProtect() const { return false; }
 } default_jmp_allocator;
+struct TrampolineAllocator : Xbyak::Allocator {
+    virtual uint8_t* alloc(size_t size) {
+        void* ptr = Xbyak::AlignedMalloc(size, Xbyak::inner::ALIGN_PAGE_SIZE);
+        set_memory_prot(ptr, size, MemoryProt::PROTECT_RWE);
+        return reinterpret_cast<uint8_t*>(ptr);
+    }
+    virtual void free(uint8_t* p) { Xbyak::AlignedFree(p); }
+    virtual bool useProtect() const { return false; }
+} default_trampoline_allocator;
 }  // namespace detail
 }  // namespace kthook
 

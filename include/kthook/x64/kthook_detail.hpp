@@ -6,30 +6,102 @@ namespace traits {
 template <typename Ret, typename T, typename Enable = void>
 struct count_integrals {};
 
-#ifdef KTHOOK_64_WIN
-template <typename Ret, typename... Ts>
-struct count_integrals<Ret, std::tuple<Ts...>, typename std::enable_if<std::is_void_v<Ret>>::type> {
-    static constexpr auto value = sizeof...(Ts);
+struct relay_args_info {
+    std::size_t head_size;
+    std::size_t tail_size;
+    int register_idx_if_full = -1;  // if -1 then register don't used
 };
+
+#ifdef _WIN32
+template <typename Ret, typename... Ts>
+constexpr relay_args_info internal_get_head_and_tail_size(std::size_t integral_registers_count) {
+    relay_args_info result{};
+    std::size_t used_integral_registers = sizeof...(Ts);
+    bool used = false;
+    if constexpr (!std::is_void_v<Ret>) {
+        auto res =
+            (!(std::is_trivial_v<Ret> && std::is_standard_layout_v<Ret> && (sizeof(Ret) % 2 == 0) && sizeof(Ret) <= 8));
+        if (res) used = true;
+        used_integral_registers += res;
+    }
+    if (used_integral_registers >= integral_registers_count) {
+        if (used)
+            result.head_size = integral_registers_count - 1;
+        else
+            result.head_size = integral_registers_count;
+        result.tail_size = sizeof...(Ts) - result.head_size;
+    } else {
+        if (used)
+            result.head_size = used_integral_registers - 1;
+        else
+            result.head_size = used_integral_registers;
+        result.tail_size = 0;
+        result.register_idx_if_full = static_cast<int>(used_integral_registers);
+    }
+    return result;
+}
 #else
 template <typename Ret, typename... Ts>
-struct count_integrals<Ret, std::tuple<Ts...>, typename std::enable_if<std::is_void_v<Ret>>::type> {
-    static constexpr auto value = (std::is_integral_v<Ts> + ... + 0) + (std::is_pointer_v<Ts> + ... + 0);
-};
+constexpr relay_args_info internal_get_head_and_tail_size(std::size_t integral_registers_count) {
+    relay_args_info result{};
+    std::size_t used_integral_registers =
+        ((std::is_pointer_v<Ts> || std::is_integral_v<Ts>) || (std::is_trivial_v<Ts> && (sizeof(Ts) <= 16)) * 2 ||
+         !(std::is_trivial_v<Ts>)) +
+        ... + 0;
+    bool used = false;
+    if constexpr (!std::is_void_v<Ret>) {
+        auto res =
+            (!(std::is_trivial_v<Ret> && std::is_standard_layout_v<Ret> && (sizeof(Ret) % 2 == 0) && sizeof(Ret) <= 8));
+        if (res) used = true;
+        used_integral_registers += res;
+    }
+    if (used_integral_registers >= integral_registers_count) {
+        if (used)
+            result.head_size = integral_registers_count - 1;
+        else
+            result.head_size = integral_registers_count;
+        result.tail_size = sizeof...(Ts) - result.head_size;
+    } else {
+        if (used)
+            result.head_size = used_integral_registers - 1;
+        else
+            result.head_size = used_integral_registers;
+        result.tail_size = 0;
+        result.register_idx_if_full = static_cast<int>(used_integral_registers);
+    }
+    return result;
+}
 #endif
 
-#ifdef KTHOOK_64_WIN
-template <typename Ret, typename... Ts>
-struct count_integrals<Ret, std::tuple<Ts...>, typename std::enable_if<!std::is_void_v<Ret>>::type> {
-    static constexpr auto value = sizeof...(Ts) + (!(std::is_trivial_v<Ret> && std::is_standard_layout_v<Ret> &&
-                                                     (sizeof(Ret) % 2 == 0) && sizeof(Ret) <= 8));
+template <std::size_t RegistersCount, typename Ret, typename Tuple>
+struct get_head_and_tail_size {};
+
+template <std::size_t RegistersCount, typename Ret, typename... Ts>
+struct get_head_and_tail_size<RegistersCount, Ret, std::tuple<Ts...>> {
+    static constexpr auto value = internal_get_head_and_tail_size<Ret, Ts...>(RegistersCount);
 };
-#else
-template <typename Ret, typename... Ts>
-struct count_integrals<Ret, std::tuple<Ts...>, typename std::enable_if<!std::is_void_v<Ret>>::type> {
-    static constexpr auto value = (std::is_integral_v<Ts> + ... + 0) + (std::is_pointer_v<Ts> + ... + 0);
+
+template <typename Tuple, typename Sequence>
+struct get_first_n_types {};
+
+template <typename Tuple, std::size_t... Is>
+struct get_first_n_types<Tuple, std::index_sequence<Is...>> {
+    using type = std::tuple<std::tuple_element_t<Is, Tuple>...>;
 };
-#endif
+
+template <std::size_t N, typename Tuple>
+using get_first_n_types_t = typename get_first_n_types<Tuple, std::make_index_sequence<N>>::type;
+
+template <std::size_t N, typename Tuple, typename Sequence>
+struct get_last_n_types {};
+
+template <std::size_t N, typename Tuple, std::size_t... Is>
+struct get_last_n_types<N, Tuple, std::index_sequence<Is...>> {
+    using type = std::tuple<std::tuple_element_t<Is + N, Tuple>...>;
+};
+
+template <std::size_t N, typename Tuple, std::size_t TupleSize>
+using get_last_n_types_t = typename get_last_n_types<TupleSize - N, Tuple, std::make_index_sequence<N>>::type;
 
 template <typename Ret, typename Tuple>
 struct function_connect_ptr;
@@ -75,26 +147,29 @@ template <class R, class... Types>
 using function_connect_t = typename function_connect<R, Types...>::type;
 
 template <typename Ret, typename T>
-constexpr auto count_integrals_v = count_integrals<Ret, T>::value;
+constexpr auto get_head_size_v = get_head_size<Ret, T>::value;
+
 }  // namespace traits
 
-template <typename HookType, typename Ret, typename Tuple>
+template <typename HookType, typename Ret, typename Head, typename Tail, typename Args>
 struct common_relay_generator {};
 
-template <typename HookType, typename Ret, typename... Ts>
-struct common_relay_generator<HookType, Ret, std::tuple<Ts...>> {
-    static Ret relay(Ts... args, HookType* this_hook) {
+template <typename HookType, typename Ret, typename... Head, typename... Tail, typename... Args>
+struct common_relay_generator<HookType, Ret, std::tuple<Head...>, std::tuple<Tail...>, std::tuple<Args...>> {
+    static Ret relay(Head... head_args, HookType* this_hook, Tail... tail_args) {
         auto& cb = this_hook->get_callback();
-        return common_relay<decltype(cb), HookType, Ret, Ts...>(cb, this_hook, args...);
+        return common_relay<decltype(cb), HookType, Ret, Args...>(cb, this_hook, head_args..., tail_args...);
     }
 };
 
-template <typename HookType, typename Ret, typename Tuple>
+template <typename HookType, typename Ret, typename Head, typename Tail, typename Args>
 struct signal_relay_generator {};
 
-template <typename HookType, typename Ret, typename... Ts>
-struct signal_relay_generator<HookType, Ret, std::tuple<Ts...>> {
-    static Ret relay(Ts... args, HookType* this_hook) { return signal_relay<HookType, Ret, Ts...>(this_hook, args...); }
+template <typename HookType, typename Ret, typename... Head, typename... Tail, typename... Args>
+struct signal_relay_generator<HookType, Ret, std::tuple<Head...>, std::tuple<Tail...>, std::tuple<Args...>> {
+    static Ret relay(Head... head_args, HookType* this_hook, Tail... tail_args) {
+        return signal_relay<HookType, Ret, Args...>(this_hook, head_args..., tail_args...);
+    }
 };
 
 inline std::uintptr_t find_prev_free(std::uintptr_t from, std::uintptr_t to, std::uintptr_t granularity) {

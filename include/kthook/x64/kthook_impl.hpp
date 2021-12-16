@@ -127,8 +127,9 @@ inline bool create_trampoline(std::uintptr_t hook_address,
 
             // Relative address is stored at (instruction length - immediate value length - 4).
             pRelAddr = reinterpret_cast<std::uint32_t*>(inst_buf + hs.len - ((hs.flags & 0x3C) >> 2) - 4);
-            *pRelAddr = (std::uint32_t)((current_address + hs.len + (std::int32_t)hs.disp.disp32) -
-                                        ((std::uintptr_t)(trampoline_gen->getCurr()) + hs.len));
+            auto value_pointer = current_address + static_cast<std::int32_t>(hs.disp.disp32);
+            *pRelAddr = static_cast<uint32_t>(value_pointer -
+                                              reinterpret_cast<const std::uintptr_t>(trampoline_gen->getCurr()));
 
             // Complete the function if JMP (FF /4).
             if (hs.opcode == 0xFF && hs.modrm_reg == 4) finished = true;
@@ -233,8 +234,6 @@ class kthook_simple {
         hook_info(std::uintptr_t a) : hook_address(a), original_code(nullptr) {}
     };
 
-    friend struct detail::common_relay_generator<kthook_simple, Ret, Args>;
-
 public:
     kthook_simple() : info(0, nullptr) {}
 
@@ -261,12 +260,13 @@ public:
     ~kthook_simple() { remove(); }
 
     bool install() {
+        if (info.hook_address == 0) return false;
         if (!detail::check_is_executable(reinterpret_cast<void*>(info.hook_address))) return false;
-        jump_gen = std::make_unique<Xbyak::CodeGenerator>(
-            Xbyak::DEFAULT_MAX_CODE_SIZE, detail::try_alloc_near(info.hook_address), &detail::default_jmp_allocator);
+        if (!create_generators()) return false;
         if (!detail::create_trampoline(info.hook_address, trampoline_gen)) return false;
         if (!detail::flush_intruction_cache(trampoline_gen->getCode(), trampoline_gen->getSize())) return false;
         if (!patch_hook(true)) return false;
+        if (!detail::flush_intruction_cache(reinterpret_cast<void*>(info.hook_address), hook_size)) return false;
         return true;
     }
 
@@ -291,33 +291,44 @@ public:
 
     void set_dest(function_ptr address) { set_dest(reinterpret_cast<std::uintptr_t>(address)); }
 
-    std::uintptr_t get_return_address() const { return *last_return_address; }
+    std::uintptr_t get_return_address() const {
+        return (using_ptr_to_return_address) ? *last_return_address : last_return_address;
+    }
 
-    std::uintptr_t* get_return_address_ptr() const { return last_return_address; }
+    std::uintptr_t* get_return_address_ptr() const {
+        return (using_ptr_to_return_address) ? last_return_address : &last_return_address;
+    }
 
     const CPU_Context& get_context() const { return context; }
 
     const function_ptr get_trampoline() const {
         return reinterpret_cast<const function_ptr>(trampoline_gen->getCode());
     }
+    cb_type& get_callback() { return callback; }
 
 private:
-    cb_type& get_callback() { return callback; }
+    bool create_generators() {
+        void* alloc = detail::try_alloc_near(info.hook_address);
+        if (alloc == nullptr) return false;
+        void* jump_alloc = alloc;
+        void* trampoline_alloc = reinterpret_cast<void*>(reinterpret_cast<std::uintptr_t>(jump_alloc) + 0x800);
+        jump_gen = std::make_unique<Xbyak::CodeGenerator>(Xbyak::DEFAULT_MAX_CODE_SIZE, jump_alloc,
+                                                          &detail::default_jmp_allocator);
+        trampoline_gen = std::make_unique<Xbyak::CodeGenerator>(Xbyak::DEFAULT_MAX_CODE_SIZE, trampoline_alloc,
+                                                                &detail::default_trampoline_allocator);
+        return true;
+    }
 
     const std::uint8_t* generate_relay_jump() {
         using namespace Xbyak::util;
 
         auto hook_address = info.hook_address;
 
-        Xbyak::Label UserCode;
+        Xbyak::Label UserCode, ret_addr;
         jump_gen->jmp(UserCode, Xbyak::CodeGenerator::LabelType::T_NEAR);
         jump_gen->nop(3);
         detail::create_trampoline(hook_address, jump_gen);
         jump_gen->L(UserCode);
-        jump_gen->mov(ptr[reinterpret_cast<std::uintptr_t>(&context.rax)], rax);
-        jump_gen->mov(rax, rsp);
-        jump_gen->mov(ptr[reinterpret_cast<std::uintptr_t>(&last_return_address)], rax);
-        jump_gen->mov(rax, ptr[reinterpret_cast<std::uintptr_t>(&context.rax)]);
         if constexpr (create_context) {
             jump_gen->mov(rsp, reinterpret_cast<std::uintptr_t>(&context.align));
             jump_gen->pushfq();
@@ -343,27 +354,51 @@ private:
 
 #if defined(KTHOOK_64_WIN)
         constexpr std::array registers{rcx, rdx, r8, r9};
-        constexpr auto last_integral = detail::traits::count_integrals_v<Ret, Args>;
 #elif defined(KTHOOK_64_GCC)
         constexpr std::array registers{rdi, rsi, rdx, rcx, r8, r9};
-        constexpr auto last_integral = detail::traits::count_integrals_v<Ret, Args>;
 #endif
-        if constexpr (registers.size() <= last_integral) {
+        constexpr detail::traits::relay_args_info args_info =
+            detail::traits::get_head_and_tail_size<registers.size(), Ret, Args>::value;
+        using head = detail::traits::get_first_n_types_t<args_info.head_size, Args>;
+        using tail = detail::traits::get_last_n_types_t<args_info.tail_size, Args, function::args_count>;
+
+        void* relay_ptr =
+            reinterpret_cast<void*>(&detail::common_relay_generator<kthook_simple, Ret, head, tail, Args>::relay);
+        if constexpr (args_info.register_idx_if_full == -1) {
+            using_ptr_to_return_address = false;
             jump_gen->mov(rax, rcx);
             jump_gen->mov(ptr[reinterpret_cast<std::uintptr_t>(&context.rcx)], rax);
-            jump_gen->pop(rax);
-            jump_gen->mov(rcx, reinterpret_cast<std::uintptr_t>(this));
+            jump_gen->pop(rcx);
+            jump_gen->add(rsp, sizeof(void*) * (registers.size() - 1));
+            jump_gen->mov(rax, reinterpret_cast<std::uintptr_t>(this));
+            jump_gen->mov(ptr[rsp], rax);
+            jump_gen->sub(rsp, sizeof(void*) * (registers.size()));
             jump_gen->push(rcx);
-            jump_gen->push(rax);
+            jump_gen->mov(rax, ptr[rsp]);
+            jump_gen->mov(ptr[reinterpret_cast<std::uintptr_t>(&last_return_address)], rax);
             jump_gen->mov(rax, ptr[reinterpret_cast<std::uintptr_t>(&context.rcx)]);
             jump_gen->mov(rcx, rax);
+            jump_gen->mov(rax, ret_addr);
+            jump_gen->mov(ptr[rsp], rax);
+            jump_gen->jmp(ptr[rip]);
+            jump_gen->db(reinterpret_cast<std::uintptr_t>(relay_ptr), 8);
+            jump_gen->L(ret_addr);
+            jump_gen->add(rsp, sizeof(void*));
+            jump_gen->mov(ptr[reinterpret_cast<std::uintptr_t>(&context.rax)], rax);
+            jump_gen->mov(rax, ptr[reinterpret_cast<std::uintptr_t>(&last_return_address)]);
+            jump_gen->push(rax);
+            jump_gen->mov(rax, ptr[reinterpret_cast<std::uintptr_t>(&context.rax)]);
+            jump_gen->ret();
         } else {
-            jump_gen->mov(registers[last_integral], reinterpret_cast<std::uintptr_t>(this));
+            using_ptr_to_return_address = true;
+            jump_gen->mov(ptr[reinterpret_cast<std::uintptr_t>(&context.rax)], rax);
+            jump_gen->mov(rax, rsp);
+            jump_gen->mov(ptr[reinterpret_cast<std::uintptr_t>(&last_return_address)], rax);
+            jump_gen->mov(rax, ptr[reinterpret_cast<std::uintptr_t>(&context.rax)]);
+            jump_gen->mov(registers[args_info.register_idx_if_full], reinterpret_cast<std::uintptr_t>(this));
+            jump_gen->jmp(ptr[rip]);
+            jump_gen->db(reinterpret_cast<std::uintptr_t>(relay_ptr), 8);
         }
-
-        void* relay_ptr = reinterpret_cast<void*>(&detail::common_relay_generator<kthook_simple, Ret, Args>::relay);
-        jump_gen->jmp(ptr[rip]);
-        jump_gen->db(reinterpret_cast<std::uintptr_t>(relay_ptr), 8);
         detail::flush_intruction_cache(jump_gen->getCode(), jump_gen->getSize());
         return jump_gen->getCode();
     }
@@ -404,8 +439,7 @@ private:
             std::memcpy(reinterpret_cast<void*>(&original), relay_jump, sizeof(original));
             jump_gen->rewrite(0, 0x9090909090909090, 8);
         }
-        if (jump_gen.get())
-            detail::flush_intruction_cache(relay_jump, jump_gen->getSize());
+        if (jump_gen.get()) detail::flush_intruction_cache(relay_jump, jump_gen->getSize());
         return true;
     }
 
@@ -414,10 +448,11 @@ private:
     std::uintptr_t* last_return_address = nullptr;
     std::size_t hook_size = 0;
     std::unique_ptr<Xbyak::CodeGenerator> jump_gen;
-    std::unique_ptr<Xbyak::CodeGenerator> trampoline_gen{std::make_unique<Xbyak::CodeGenerator>()};
+    std::unique_ptr<Xbyak::CodeGenerator> trampoline_gen;
     std::uint64_t original = 0;
     const std::uint8_t* relay_jump = nullptr;
     std::conditional_t<create_context, CPU_Context, detail::CPU_Context_empty> context;
+    bool using_ptr_to_return_address = true;
 };
 
 template <typename FunctionPtrT, kthook_option Options = kthook_option::kNone>
@@ -440,8 +475,6 @@ class kthook_signal {
         hook_info(std::uintptr_t a) : hook_address(a), original_code(nullptr) {}
     };
 
-    friend struct detail::signal_relay_generator<kthook_signal, Ret, Args>;
-
 public:
     kthook_signal() : info(0, nullptr) {}
 
@@ -462,11 +495,11 @@ public:
     bool install() {
         if (info.hook_address == 0) return false;
         if (!detail::check_is_executable(reinterpret_cast<void*>(info.hook_address))) return false;
-        jump_gen = std::make_unique<Xbyak::CodeGenerator>(
-            Xbyak::DEFAULT_MAX_CODE_SIZE, detail::try_alloc_near(info.hook_address), &detail::default_jmp_allocator);
+        if (!create_generators()) return false;
         if (!detail::create_trampoline(info.hook_address, trampoline_gen)) return false;
         if (!detail::flush_intruction_cache(trampoline_gen->getCode(), trampoline_gen->getSize())) return false;
         if (!patch_hook(true)) return false;
+        if (!detail::flush_intruction_cache(reinterpret_cast<void*>(info.hook_address), hook_size)) return false;
         return true;
     }
 
@@ -488,9 +521,13 @@ public:
 
     void set_dest(function_ptr address) { set_dest(reinterpret_cast<std::uintptr_t>(address)); }
 
-    std::uintptr_t get_return_address() const { return *last_return_address; }
+    std::uintptr_t get_return_address() const {
+        return (using_ptr_to_return_address) ? *last_return_address : last_return_address;
+    }
 
-    std::uintptr_t* get_return_address_ptr() const { return last_return_address; }
+    std::uintptr_t* get_return_address_ptr() const {
+        return (using_ptr_to_return_address) ? last_return_address : &last_return_address;
+    }
 
     const CPU_Context& get_context() const { return context; }
 
@@ -500,20 +537,28 @@ public:
     after_t after;
 
 private:
+    bool create_generators() {
+        void* alloc = detail::try_alloc_near(info.hook_address);
+        if (alloc == nullptr) return false;
+        void* jump_alloc = alloc;
+        void* trampoline_alloc = reinterpret_cast<void*>(reinterpret_cast<std::uintptr_t>(jump_alloc) + 0x800);
+        jump_gen = std::make_unique<Xbyak::CodeGenerator>(Xbyak::DEFAULT_MAX_CODE_SIZE, jump_alloc,
+                                                          &detail::default_jmp_allocator);
+        trampoline_gen = std::make_unique<Xbyak::CodeGenerator>(Xbyak::DEFAULT_MAX_CODE_SIZE, trampoline_alloc,
+                                                                &detail::default_trampoline_allocator);
+        return true;
+    }
+
     const std::uint8_t* generate_relay_jump() {
         using namespace Xbyak::util;
 
         auto hook_address = info.hook_address;
 
-        Xbyak::Label UserCode;
+        Xbyak::Label UserCode, ret_addr;
         jump_gen->jmp(UserCode, Xbyak::CodeGenerator::LabelType::T_NEAR);
         jump_gen->nop(3);
         detail::create_trampoline(hook_address, jump_gen);
         jump_gen->L(UserCode);
-        jump_gen->mov(ptr[reinterpret_cast<std::uintptr_t>(&context.rax)], rax);
-        jump_gen->mov(rax, rsp);
-        jump_gen->mov(ptr[reinterpret_cast<std::uintptr_t>(&last_return_address)], rax);
-        jump_gen->mov(rax, ptr[reinterpret_cast<std::uintptr_t>(&context.rax)]);
         if constexpr (create_context) {
             jump_gen->mov(rsp, reinterpret_cast<std::uintptr_t>(&context.align));
             jump_gen->pushfq();
@@ -539,27 +584,51 @@ private:
 
 #if defined(KTHOOK_64_WIN)
         constexpr std::array registers{rcx, rdx, r8, r9};
-        constexpr auto last_integral = detail::traits::count_integrals_v<Ret, Args>;
 #elif defined(KTHOOK_64_GCC)
         constexpr std::array registers{rdi, rsi, rdx, rcx, r8, r9};
-        constexpr auto last_integral = detail::traits::count_integrals_v<Ret, Args>;
 #endif
-        if constexpr (registers.size() <= last_integral) {
+        constexpr detail::traits::relay_args_info args_info =
+            detail::traits::get_head_and_tail_size<registers.size(), Ret, Args>::value;
+        using head = detail::traits::get_first_n_types_t<args_info.head_size, Args>;
+        using tail = detail::traits::get_last_n_types_t<args_info.tail_size, Args, function::args_count>;
+
+        void* relay_ptr =
+            reinterpret_cast<void*>(&detail::signal_relay_generator<kthook_signal, Ret, head, tail, Args>::relay);
+        if constexpr (args_info.register_idx_if_full == -1) {
+            using_ptr_to_return_address = false;
             jump_gen->mov(rax, rcx);
             jump_gen->mov(ptr[reinterpret_cast<std::uintptr_t>(&context.rcx)], rax);
-            jump_gen->pop(rax);
-            jump_gen->mov(rcx, reinterpret_cast<std::uintptr_t>(this));
+            jump_gen->pop(rcx);
+            jump_gen->add(rsp, static_cast<uint32_t>(sizeof(void*) * (registers.size() - 1)));
+            jump_gen->mov(rax, reinterpret_cast<std::uintptr_t>(this));
+            jump_gen->mov(ptr[rsp], rax);
+            jump_gen->sub(rsp, static_cast<uint32_t>(sizeof(void*) * (registers.size())));
             jump_gen->push(rcx);
-            jump_gen->push(rax);
+            jump_gen->mov(rax, ptr[rsp]);
+            jump_gen->mov(ptr[reinterpret_cast<std::uintptr_t>(&last_return_address)], rax);
             jump_gen->mov(rax, ptr[reinterpret_cast<std::uintptr_t>(&context.rcx)]);
             jump_gen->mov(rcx, rax);
+            jump_gen->mov(rax, ret_addr);
+            jump_gen->mov(ptr[rsp], rax);
+            jump_gen->jmp(ptr[rip]);
+            jump_gen->db(reinterpret_cast<std::uintptr_t>(relay_ptr), 8);
+            jump_gen->L(ret_addr);
+            jump_gen->add(rsp, sizeof(void*));
+            jump_gen->mov(ptr[reinterpret_cast<std::uintptr_t>(&context.rax)], rax);
+            jump_gen->mov(rax, ptr[reinterpret_cast<std::uintptr_t>(&last_return_address)]);
+            jump_gen->push(rax);
+            jump_gen->mov(rax, ptr[reinterpret_cast<std::uintptr_t>(&context.rax)]);
+            jump_gen->ret();
         } else {
-            jump_gen->mov(registers[last_integral], reinterpret_cast<std::uintptr_t>(this));
+            using_ptr_to_return_address = true;
+            jump_gen->mov(ptr[reinterpret_cast<std::uintptr_t>(&context.rax)], rax);
+            jump_gen->mov(rax, rsp);
+            jump_gen->mov(ptr[reinterpret_cast<std::uintptr_t>(&last_return_address)], rax);
+            jump_gen->mov(rax, ptr[reinterpret_cast<std::uintptr_t>(&context.rax)]);
+            jump_gen->mov(registers[args_info.register_idx_if_full], reinterpret_cast<std::uintptr_t>(this));
+            jump_gen->jmp(ptr[rip]);
+            jump_gen->db(reinterpret_cast<std::uintptr_t>(relay_ptr), 8);
         }
-
-        void* relay_ptr = reinterpret_cast<void*>(&detail::signal_relay_generator<kthook_signal, Ret, Args>::relay);
-        jump_gen->jmp(ptr[rip]);
-        jump_gen->db(reinterpret_cast<std::uintptr_t>(relay_ptr), 8);
         detail::flush_intruction_cache(jump_gen->getCode(), jump_gen->getSize());
         return jump_gen->getCode();
     }
@@ -600,8 +669,7 @@ private:
             std::memcpy(reinterpret_cast<void*>(&original), relay_jump, sizeof(original));
             jump_gen->rewrite(0, 0x9090909090909090, 8);
         }
-        if (jump_gen.get())
-            detail::flush_intruction_cache(relay_jump, jump_gen->getSize());
+        if (jump_gen.get()) detail::flush_intruction_cache(relay_jump, jump_gen->getSize());
         return true;
     }
 
@@ -609,10 +677,11 @@ private:
     std::uintptr_t* last_return_address = nullptr;
     std::size_t hook_size = 0;
     std::unique_ptr<Xbyak::CodeGenerator> jump_gen;
-    std::unique_ptr<Xbyak::CodeGenerator> trampoline_gen{std::make_unique<Xbyak::CodeGenerator>()};
+    std::unique_ptr<Xbyak::CodeGenerator> trampoline_gen;
     std::uint64_t original = 0;
     const std::uint8_t* relay_jump = nullptr;
     std::conditional_t<create_context, CPU_Context, detail::CPU_Context_empty> context;
+    bool using_ptr_to_return_address = true;
 };
 }  // namespace kthook
 

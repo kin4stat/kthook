@@ -1,6 +1,5 @@
 .vscode
 /.vs
-/out/build/windows-default
-/out/build/windows-default-x86
 /CMakePresets.json
-/out/-1406800992/build/linux-default
+/build
+/out/
