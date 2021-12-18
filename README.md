@@ -2,6 +2,8 @@
 
 X86 hooking library with functor callbacks support, so you can use lambdas with state, std::bind values etc...
 
+[![Windows](https://github.com/kin4stat/kthook/actions/workflows/windows-build.yml/badge.svg)](https://github.com/kin4stat/kthook/actions/workflows/windows-build.yml)
+
 ## Usage
 
 Clone repository and simply include kthook.hpp. C++17 compatible compiler required
