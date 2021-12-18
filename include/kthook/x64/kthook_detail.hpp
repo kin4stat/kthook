@@ -44,10 +44,14 @@ constexpr relay_args_info internal_get_head_and_tail_size(std::size_t integral_r
 template <typename Ret, typename... Ts>
 constexpr relay_args_info internal_get_head_and_tail_size(std::size_t integral_registers_count) {
     relay_args_info result{};
-    std::size_t used_integral_registers =
-        ((std::is_pointer_v<Ts> || std::is_integral_v<Ts>) || (std::is_trivial_v<Ts> && (sizeof(Ts) <= 16)) * 2 ||
-         !(std::is_trivial_v<Ts>)) +
-        ... + 0;
+    std::size_t used_integral_registers = 0;
+    bool is_integer[] = { (std::is_pointer_v<Ts> || std::is_integral_v<Ts>)... };
+    bool is_trivial[] = { (std::is_trivial_v<Ts> && sizeof(Ts) <= 16)... };
+    bool not_trivial[] = { !(std::is_trivial_v<Ts>)... };
+
+    for (auto i = 0u; i < sizeof(is_integer); i++) {
+        if (is_integer[i] || is_trivial[i] || not_trivial[i]) ++used_integral_registers;
+    }
     bool used = false;
     if constexpr (!std::is_void_v<Ret>) {
         auto res =
@@ -145,9 +149,6 @@ using function_connect_ptr_t = typename function_connect_ptr<Ret, Args...>::type
 
 template <class R, class... Types>
 using function_connect_t = typename function_connect<R, Types...>::type;
-
-template <typename Ret, typename T>
-constexpr auto get_head_size_v = get_head_size<Ret, T>::value;
 
 }  // namespace traits
 

@@ -292,11 +292,11 @@ public:
     void set_dest(function_ptr address) { set_dest(reinterpret_cast<std::uintptr_t>(address)); }
 
     std::uintptr_t get_return_address() const {
-        return (using_ptr_to_return_address) ? *last_return_address : last_return_address;
+        return (using_ptr_to_return_address) ? *last_return_address : reinterpret_cast<std::uintptr_t>(last_return_address);
     }
 
     std::uintptr_t* get_return_address_ptr() const {
-        return (using_ptr_to_return_address) ? last_return_address : &last_return_address;
+        return (using_ptr_to_return_address) ? last_return_address : reinterpret_cast<std::uintptr_t*>(&last_return_address);
     }
 
     const CPU_Context& get_context() const { return context; }
@@ -369,10 +369,16 @@ private:
             jump_gen->mov(rax, rcx);
             jump_gen->mov(ptr[reinterpret_cast<std::uintptr_t>(&context.rcx)], rax);
             jump_gen->pop(rcx);
-            jump_gen->add(rsp, sizeof(void*) * (registers.size() - 1));
+#ifdef KTHOOK_64_WIN
+            jump_gen->add(rsp, static_cast<std::uint32_t>(sizeof(void*) * (registers.size() - 1)));
+#endif
             jump_gen->mov(rax, reinterpret_cast<std::uintptr_t>(this));
             jump_gen->mov(ptr[rsp], rax);
-            jump_gen->sub(rsp, sizeof(void*) * (registers.size()));
+#ifdef KTHOOK_64_WIN
+            jump_gen->sub(rsp, static_cast<std::uint32_t>(sizeof(void*) * (registers.size())));
+#else
+            jump_gen->sub(rsp, 8);
+#endif
             jump_gen->push(rcx);
             jump_gen->mov(rax, ptr[rsp]);
             jump_gen->mov(ptr[reinterpret_cast<std::uintptr_t>(&last_return_address)], rax);
@@ -522,11 +528,11 @@ public:
     void set_dest(function_ptr address) { set_dest(reinterpret_cast<std::uintptr_t>(address)); }
 
     std::uintptr_t get_return_address() const {
-        return (using_ptr_to_return_address) ? *last_return_address : last_return_address;
+        return (using_ptr_to_return_address) ? *last_return_address : reinterpret_cast<std::uintptr_t>(last_return_address);
     }
 
     std::uintptr_t* get_return_address_ptr() const {
-        return (using_ptr_to_return_address) ? last_return_address : &last_return_address;
+        return (using_ptr_to_return_address) ? last_return_address : reinterpret_cast<std::uintptr_t*>(&last_return_address);
     }
 
     const CPU_Context& get_context() const { return context; }
@@ -599,10 +605,16 @@ private:
             jump_gen->mov(rax, rcx);
             jump_gen->mov(ptr[reinterpret_cast<std::uintptr_t>(&context.rcx)], rax);
             jump_gen->pop(rcx);
-            jump_gen->add(rsp, static_cast<uint32_t>(sizeof(void*) * (registers.size() - 1)));
+#ifdef KTHOOK_64_WIN
+            jump_gen->add(rsp, static_cast<std::uint32_t>(sizeof(void*) * (registers.size() - 1)));
+#endif
             jump_gen->mov(rax, reinterpret_cast<std::uintptr_t>(this));
             jump_gen->mov(ptr[rsp], rax);
-            jump_gen->sub(rsp, static_cast<uint32_t>(sizeof(void*) * (registers.size())));
+#ifdef KTHOOK_64_WIN
+            jump_gen->sub(rsp, static_cast<std::uint32_t>(sizeof(void*) * (registers.size())));
+#else
+            jump_gen->sub(rsp, 8);
+#endif
             jump_gen->push(rcx);
             jump_gen->mov(rax, ptr[rsp]);
             jump_gen->mov(ptr[reinterpret_cast<std::uintptr_t>(&last_return_address)], rax);
@@ -619,7 +631,8 @@ private:
             jump_gen->push(rax);
             jump_gen->mov(rax, ptr[reinterpret_cast<std::uintptr_t>(&context.rax)]);
             jump_gen->ret();
-        } else {
+        }
+        else {
             using_ptr_to_return_address = true;
             jump_gen->mov(ptr[reinterpret_cast<std::uintptr_t>(&context.rax)], rax);
             jump_gen->mov(rax, rsp);
