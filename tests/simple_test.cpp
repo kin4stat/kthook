@@ -7,17 +7,20 @@ constexpr int test_val = 5;
 
 DECLARE_SIZE_ENLARGER();
 
-int NO_OPTIMIZE
+class A {
+public:
+    NO_OPTIMIZE static  int
 #ifdef KTHOOK_32
-    TEST_CCONV
+        TEST_CCONV
 #endif
-    test_func(int value) {
-    SIZE_ENLARGER();
-    return value;
-}
+        test_func(int value) {
+        SIZE_ENLARGER();
+        return value;
+    }
+};
 
-TEST(KthookSimpleTest, HandlesSimpleUsage) {
-    kthook::kthook_simple<decltype(&test_func)> hook{&test_func};
+TEST(KthookSimpleTest, CREATE_NAME(HandlesSimpleUsage)) {
+    kthook::kthook_simple<decltype(&A::test_func)> hook{&A::test_func};
     hook.install();
 
     hook.set_cb([](const auto& hook, int& value) {
@@ -25,15 +28,15 @@ TEST(KthookSimpleTest, HandlesSimpleUsage) {
         return return_default;
     });
 
-    EXPECT_EQ(test_func(test_val), return_default);
+    EXPECT_EQ(A::test_func(test_val), return_default);
 
     hook.set_cb([](const auto& hook, int& value) { return hook.get_trampoline()(return_default); });
 
-    EXPECT_EQ(test_func(test_val), return_default);
+    EXPECT_EQ(A::test_func(test_val), return_default);
 }
 
-TEST(KthookSiginalTest, HandlesSimpleUsage) {
-    kthook::kthook_signal<decltype(&test_func)> hook{&test_func};
+TEST(KthookSiginalTest, CREATE_NAME(HandlesSimpleUsage)) {
+    kthook::kthook_signal<decltype(&A::test_func)> hook{&A::test_func};
 
     {
         auto connection = hook.before.scoped_connect([](const auto& hook, int& value) {
@@ -41,20 +44,20 @@ TEST(KthookSiginalTest, HandlesSimpleUsage) {
             return std::nullopt;
         });
 
-        EXPECT_EQ(test_func(test_val), return_default);
+        EXPECT_EQ(A::test_func(test_val), return_default);
     }
 
     {
         auto connection =
             hook.before.scoped_connect([](const auto& hook, int& value) { return std::make_optional(return_default); });
 
-        EXPECT_EQ(test_func(test_val), return_default);
+        EXPECT_EQ(A::test_func(test_val), return_default);
     }
 
     {
         auto connection = hook.after.scoped_connect(
             [](const auto& hook, int& return_value, int& value) { return_value = return_default; });
 
-        EXPECT_EQ(test_func(test_val), return_default);
+        EXPECT_EQ(A::test_func(test_val), return_default);
     }
 }

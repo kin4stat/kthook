@@ -51,34 +51,38 @@ constexpr SmallAggregate small_args{1, 2};
 
 DECLARE_SIZE_ENLARGER();
 
-BigAggregate NO_OPTIMIZE
+class A {
+public:
+    NO_OPTIMIZE static  BigAggregate
 #ifdef KTHOOK_32
-    TEST_CCONV
+        TEST_CCONV
 #endif
-    big_test_func(BigAggregate value) {
-    SIZE_ENLARGER();
-    return value;
-}
-MediumAggregate NO_OPTIMIZE
+        big_test_func(BigAggregate value) {
+        SIZE_ENLARGER();
+        return value;
+    }
+    NO_OPTIMIZE static MediumAggregate
 #ifdef KTHOOK_32
-    TEST_CCONV
+        TEST_CCONV
 #endif
-    medium_test_func(MediumAggregate value) {
-    SIZE_ENLARGER();
-    return value;
-}
+        medium_test_func(MediumAggregate value) {
+        SIZE_ENLARGER();
+        return value;
+    }
+    NO_OPTIMIZE static SmallAggregate
+#ifdef KTHOOK_32
+        TEST_CCONV
+#endif
+        small_test_func(SmallAggregate value) {
+        SIZE_ENLARGER();
+        return value;
+    }
+};
 
-SmallAggregate NO_OPTIMIZE
-#ifdef KTHOOK_32
-    TEST_CCONV
-#endif
-    small_test_func(SmallAggregate value) {
-    SIZE_ENLARGER();
-    return value;
-}
 
-TEST(KthookSimpleTest, BigAggregate) {
-    kthook::kthook_simple<decltype(&big_test_func)> hook{&big_test_func};
+
+TEST(KthookSimpleTest, CREATE_NAME(BigAggregate)) {
+    kthook::kthook_simple<decltype(&A::big_test_func)> hook{&A::big_test_func};
     hook.install();
 
     int counter = 0;
@@ -90,12 +94,12 @@ TEST(KthookSimpleTest, BigAggregate) {
         ++counter;
         return ret_val;
     });
-    EXPECT_TRUE(big_test_func(big_args) == big_args);
+    EXPECT_TRUE(A::big_test_func(big_args) == big_args);
     EXPECT_EQ(counter, 2);
 }
 
-TEST(KthookSignalTest, BigAggregate) {
-    kthook::kthook_signal<decltype(&big_test_func)> hook{&big_test_func};
+TEST(KthookSignalTest, CREATE_NAME(BigAggregate)) {
+    kthook::kthook_signal<decltype(&A::big_test_func)> hook{&A::big_test_func};
 
     {
         int counter = 0;
@@ -105,7 +109,7 @@ TEST(KthookSignalTest, BigAggregate) {
                 ++counter;
                 return std::nullopt;
             });
-        EXPECT_TRUE(big_test_func(big_args) == big_args);
+        EXPECT_TRUE(A::big_test_func(big_args) == big_args);
         EXPECT_EQ(counter, 1);
     }
     {
@@ -116,13 +120,13 @@ TEST(KthookSignalTest, BigAggregate) {
             EXPECT_TRUE(ret_val == value);
             ++counter;
         });
-        EXPECT_TRUE(big_test_func(big_args) == big_args);
+        EXPECT_TRUE(A::big_test_func(big_args) == big_args);
         EXPECT_EQ(counter, 2);
     }
 }
 
-TEST(KthookSimpleTest, MediumAggregate) {
-    kthook::kthook_simple<decltype(&medium_test_func)> hook{&medium_test_func};
+TEST(KthookSimpleTest, CREATE_NAME(MediumAggregate)) {
+    kthook::kthook_simple<decltype(&A::medium_test_func)> hook{&A::medium_test_func};
     hook.install();
 
     int counter = 0;
@@ -135,12 +139,12 @@ TEST(KthookSimpleTest, MediumAggregate) {
         ++counter;
         return ret_val;
     });
-    EXPECT_TRUE(medium_test_func(medium_args) == medium_args);
+    EXPECT_TRUE(A::medium_test_func(medium_args) == medium_args);
     EXPECT_EQ(counter, 2);
 }
 
-TEST(KthookSignalTest, MediumAggregate) {
-    kthook::kthook_signal<decltype(&medium_test_func)> hook{&medium_test_func};
+TEST(KthookSignalTest, CREATE_NAME(MediumAggregate)) {
+    kthook::kthook_signal<decltype(&A::medium_test_func)> hook{&A::medium_test_func};
 
     {
         int counter = 0;
@@ -150,7 +154,7 @@ TEST(KthookSignalTest, MediumAggregate) {
                 ++counter;
                 return std::nullopt;
             });
-        EXPECT_TRUE(medium_test_func(medium_args) == medium_args);
+        EXPECT_TRUE(A::medium_test_func(medium_args) == medium_args);
         EXPECT_EQ(counter, 1);
     }
     {
@@ -162,13 +166,13 @@ TEST(KthookSignalTest, MediumAggregate) {
                 EXPECT_TRUE(ret_val == value);
                 ++counter;
             });
-        EXPECT_TRUE(medium_test_func(medium_args) == medium_args);
+        EXPECT_TRUE(A::medium_test_func(medium_args) == medium_args);
         EXPECT_EQ(counter, 2);
     }
 }
 
-TEST(KthookSimpleTest, SmallAggregate) {
-    kthook::kthook_simple<decltype(&small_test_func)> hook{&small_test_func};
+TEST(KthookSimpleTest, CREATE_NAME(SmallAggregate)) {
+    kthook::kthook_simple<decltype(&A::small_test_func)> hook{&A::small_test_func};
     hook.install();
 
     int counter = 0;
@@ -180,12 +184,12 @@ TEST(KthookSimpleTest, SmallAggregate) {
         ++counter;
         return ret_val;
     });
-    EXPECT_TRUE(small_test_func(small_args) == small_args);
+    EXPECT_TRUE(A::small_test_func(small_args) == small_args);
     EXPECT_EQ(counter, 2);
 }
 
-TEST(KthookSignalTest, SmallAggregate) {
-    kthook::kthook_signal<decltype(&small_test_func)> hook{&small_test_func};
+TEST(KthookSignalTest, CREATE_NAME(SmallAggregate)) {
+    kthook::kthook_signal<decltype(&A::small_test_func)> hook{&A::small_test_func};
 
     {
         int counter = 0;
@@ -195,7 +199,7 @@ TEST(KthookSignalTest, SmallAggregate) {
                 ++counter;
                 return std::nullopt;
             });
-        EXPECT_TRUE(small_test_func(small_args) == small_args);
+        EXPECT_TRUE(A::small_test_func(small_args) == small_args);
         EXPECT_EQ(counter, 1);
     }
     {
@@ -207,7 +211,7 @@ TEST(KthookSignalTest, SmallAggregate) {
                 EXPECT_TRUE(ret_val == value);
                 ++counter;
             });
-        EXPECT_TRUE(small_test_func(small_args) == small_args);
+        EXPECT_TRUE(A::small_test_func(small_args) == small_args);
         EXPECT_EQ(counter, 2);
     }
 }

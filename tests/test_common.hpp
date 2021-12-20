@@ -8,7 +8,9 @@
 #error Unknown compiler
 #endif
 
-#define DECLARE_SIZE_ENLARGER() volatile unsigned long long a = 5;
+#define CREATE_NAME(X) X
+
+#define DECLARE_SIZE_ENLARGER() static volatile unsigned long long a = 5;
 #define SIZE_ENLARGER() \
     switch (a) {        \
         case 1:         \
