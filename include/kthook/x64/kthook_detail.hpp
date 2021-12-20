@@ -211,8 +211,7 @@ inline std::uintptr_t find_next_free(std::uintptr_t from, std::uintptr_t to, std
         void* alloc = mmap(reinterpret_cast<void*>(from), granularity, PROT_EXEC | PROT_READ | PROT_WRITE,
                            MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED_NOREPLACE, 0, 0);
         if (reinterpret_cast<std::uintptr_t>(alloc) != 0xffffffffffffffff) return from;
-        from += granularity - 1;
-        from -= from % granularity;
+        from += granularity;
     }
     return 0;
 #endif
@@ -289,6 +288,7 @@ inline void* try_alloc_near(std::uintptr_t address) {
             if (alloc == 0) break;
 
             result = reinterpret_cast<void*>(alloc);
+            break;
         }
     }
     return result;
