@@ -43,37 +43,7 @@ constexpr relay_args_info internal_get_head_and_tail_size(std::size_t integral_r
 #else
 template <typename Ret, typename... Ts>
 constexpr relay_args_info internal_get_head_and_tail_size(std::size_t integral_registers_count) {
-    relay_args_info result{};
-    std::size_t used_integral_registers = 0;
-    bool is_integer[] = { (std::is_pointer_v<Ts> || std::is_integral_v<Ts>)... };
-    bool is_trivial[] = { (std::is_trivial_v<Ts> && sizeof(Ts) <= 16)... };
-    bool not_trivial[] = { !(std::is_trivial_v<Ts>)... };
-
-    for (auto i = 0u; i < sizeof(is_integer); i++) {
-        if (is_integer[i] || is_trivial[i] || not_trivial[i]) ++used_integral_registers;
-    }
-    bool used = false;
-    if constexpr (!std::is_void_v<Ret>) {
-        auto res =
-            (!(std::is_trivial_v<Ret> && std::is_standard_layout_v<Ret> && (sizeof(Ret) % 2 == 0) && sizeof(Ret) <= 8));
-        if (res) used = true;
-        used_integral_registers += res;
-    }
-    if (used_integral_registers >= integral_registers_count) {
-        if (used)
-            result.head_size = integral_registers_count - 1;
-        else
-            result.head_size = integral_registers_count;
-        result.tail_size = sizeof...(Ts) - result.head_size;
-    } else {
-        if (used)
-            result.head_size = used_integral_registers - 1;
-        else
-            result.head_size = used_integral_registers;
-        result.tail_size = 0;
-        result.register_idx_if_full = static_cast<int>(used_integral_registers);
-    }
-    return result;
+    return {0, sizeof...(Ts), -1};
 }
 #endif
 
@@ -152,23 +122,43 @@ using function_connect_t = typename function_connect<R, Types...>::type;
 
 }  // namespace traits
 
+#ifndef _WIN32
+template <typename HookType>
+struct SystemVAbiTrick {
+    HookType* ptr;
+private:
+    void *junk, *junk2;
+};
+
+#endif
+
 template <typename HookType, typename Ret, typename Head, typename Tail, typename Args>
 struct common_relay_generator {};
 
 template <typename HookType, typename Ret, typename... Head, typename... Tail, typename... Args>
 struct common_relay_generator<HookType, Ret, std::tuple<Head...>, std::tuple<Tail...>, std::tuple<Args...>> {
+#ifndef _WIN32
+    static Ret relay(Head... head_args, SystemVAbiTrick<HookType> rsp_ptr, Tail... tail_args){
+        auto this_hook = rsp_ptr.ptr;
+#else
     static Ret relay(Head... head_args, HookType* this_hook, Tail... tail_args) {
-        auto& cb = this_hook->get_callback();
-        return common_relay<decltype(cb), HookType, Ret, Args...>(cb, this_hook, head_args..., tail_args...);
-    }
-};
+#endif
+    auto& cb = this_hook->get_callback();
+    return common_relay<decltype(cb), HookType, Ret, Args...>(cb, this_hook, head_args..., tail_args...);
+}
+};  // namespace detail
 
 template <typename HookType, typename Ret, typename Head, typename Tail, typename Args>
 struct signal_relay_generator {};
 
 template <typename HookType, typename Ret, typename... Head, typename... Tail, typename... Args>
 struct signal_relay_generator<HookType, Ret, std::tuple<Head...>, std::tuple<Tail...>, std::tuple<Args...>> {
-    static Ret relay(Head... head_args, HookType* this_hook, Tail... tail_args) {
+#ifndef _WIN32
+    static Ret relay(Head... head_args, SystemVAbiTrick<HookType> rsp_ptr, Tail... tail_args) {
+        auto this_hook = rsp_ptr.ptr;
+#else
+    static Ret relay(Head... head_args, HookType * this_hook, Tail... tail_args) {
+#endif
         return signal_relay<HookType, Ret, Args...>(this_hook, head_args..., tail_args...);
     }
 };
@@ -304,7 +294,7 @@ inline void* try_alloc_near(std::uintptr_t address) {
     return result;
 #endif
 }
-}  // namespace detail
+}  // namespace kthook
 }  // namespace kthook
 
 #endif  // KTHOOK_DETAIL_HPP_

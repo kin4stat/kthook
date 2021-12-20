@@ -365,36 +365,58 @@ private:
         void* relay_ptr =
             reinterpret_cast<void*>(&detail::common_relay_generator<kthook_simple, Ret, head, tail, Args>::relay);
         if constexpr (args_info.register_idx_if_full == -1) {
+
             using_ptr_to_return_address = false;
+
+            // save context
             jump_gen->mov(rax, rcx);
             jump_gen->mov(ptr[reinterpret_cast<std::uintptr_t>(&context.rcx)], rax);
+
+            // pop out return address
             jump_gen->pop(rcx);
+            
 #ifdef KTHOOK_64_WIN
-            jump_gen->add(rsp, static_cast<std::uint32_t>(sizeof(void*) * (registers.size() - 1)));
-#endif
             jump_gen->mov(rax, reinterpret_cast<std::uintptr_t>(this));
+            // set rsp to next stack argument pointer
+            jump_gen->add(rsp, static_cast<std::uint32_t>(sizeof(void*) * (registers.size() - 1)));
+            // push our hook to the stack
             jump_gen->mov(ptr[rsp], rax);
+#else
+            jump_gen->mov(rax, reinterpret_cast<std::uintptr_t>(this));
+            // push our hook to the stack
+            jump_gen->push(std::uintptr_t(0));
+            jump_gen->push(std::uintptr_t(0));
+            jump_gen->push(rax);
+#endif
+            
 #ifdef KTHOOK_64_WIN
+            // return the rsp to its initial state
             jump_gen->sub(rsp, static_cast<std::uint32_t>(sizeof(void*) * (registers.size())));
 #else
-            jump_gen->sub(rsp, 8);
+
 #endif
-            jump_gen->push(rcx);
-            jump_gen->mov(rax, ptr[rsp]);
+            // save return address
+            jump_gen->mov(rax, rcx);
             jump_gen->mov(ptr[reinterpret_cast<std::uintptr_t>(&last_return_address)], rax);
+            // push our return address
+            jump_gen->mov(rax, ret_addr);
+            jump_gen->push(rax);
+
+            // restore context
             jump_gen->mov(rax, ptr[reinterpret_cast<std::uintptr_t>(&context.rcx)]);
             jump_gen->mov(rcx, rax);
-            jump_gen->mov(rax, ret_addr);
-            jump_gen->mov(ptr[rsp], rax);
+
             jump_gen->jmp(ptr[rip]);
             jump_gen->db(reinterpret_cast<std::uintptr_t>(relay_ptr), 8);
             jump_gen->L(ret_addr);
             jump_gen->add(rsp, sizeof(void*));
+            // push original return address and return
             jump_gen->mov(ptr[reinterpret_cast<std::uintptr_t>(&context.rax)], rax);
             jump_gen->mov(rax, ptr[reinterpret_cast<std::uintptr_t>(&last_return_address)]);
             jump_gen->push(rax);
             jump_gen->mov(rax, ptr[reinterpret_cast<std::uintptr_t>(&context.rax)]);
             jump_gen->ret();
+
         } else {
             using_ptr_to_return_address = true;
             jump_gen->mov(ptr[reinterpret_cast<std::uintptr_t>(&context.rax)], rax);
@@ -601,36 +623,58 @@ private:
         void* relay_ptr =
             reinterpret_cast<void*>(&detail::signal_relay_generator<kthook_signal, Ret, head, tail, Args>::relay);
         if constexpr (args_info.register_idx_if_full == -1) {
+
             using_ptr_to_return_address = false;
+
+            // save context
             jump_gen->mov(rax, rcx);
             jump_gen->mov(ptr[reinterpret_cast<std::uintptr_t>(&context.rcx)], rax);
+
+            // pop out return address
             jump_gen->pop(rcx);
+
 #ifdef KTHOOK_64_WIN
-            jump_gen->add(rsp, static_cast<std::uint32_t>(sizeof(void*) * (registers.size() - 1)));
-#endif
             jump_gen->mov(rax, reinterpret_cast<std::uintptr_t>(this));
+            // set rsp to next stack argument pointer
+            jump_gen->add(rsp, static_cast<std::uint32_t>(sizeof(void*) * (registers.size() - 1)));
+            // push our hook to the stack
             jump_gen->mov(ptr[rsp], rax);
+#else
+            jump_gen->mov(rax, reinterpret_cast<std::uintptr_t>(this));
+            // push our hook to the stack
+            jump_gen->push(std::uintptr_t(0));
+            jump_gen->push(std::uintptr_t(0));
+            jump_gen->push(rax);
+#endif
+
 #ifdef KTHOOK_64_WIN
+            // return the rsp to its initial state
             jump_gen->sub(rsp, static_cast<std::uint32_t>(sizeof(void*) * (registers.size())));
 #else
-            jump_gen->sub(rsp, 8);
+
 #endif
-            jump_gen->push(rcx);
-            jump_gen->mov(rax, ptr[rsp]);
+            // save return address
+            jump_gen->mov(rax, rcx);
             jump_gen->mov(ptr[reinterpret_cast<std::uintptr_t>(&last_return_address)], rax);
+            // push our return address
+            jump_gen->mov(rax, ret_addr);
+            jump_gen->push(rax);
+
+            // restore context
             jump_gen->mov(rax, ptr[reinterpret_cast<std::uintptr_t>(&context.rcx)]);
             jump_gen->mov(rcx, rax);
-            jump_gen->mov(rax, ret_addr);
-            jump_gen->mov(ptr[rsp], rax);
+
             jump_gen->jmp(ptr[rip]);
             jump_gen->db(reinterpret_cast<std::uintptr_t>(relay_ptr), 8);
             jump_gen->L(ret_addr);
             jump_gen->add(rsp, sizeof(void*));
+            // push original return address and return
             jump_gen->mov(ptr[reinterpret_cast<std::uintptr_t>(&context.rax)], rax);
             jump_gen->mov(rax, ptr[reinterpret_cast<std::uintptr_t>(&last_return_address)]);
             jump_gen->push(rax);
             jump_gen->mov(rax, ptr[reinterpret_cast<std::uintptr_t>(&context.rax)]);
             jump_gen->ret();
+
         }
         else {
             using_ptr_to_return_address = true;
