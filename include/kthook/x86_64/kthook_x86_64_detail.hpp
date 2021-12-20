@@ -260,7 +260,7 @@ inline bool set_memory_prot(const void* addr, std::size_t size, MemoryProt prote
     return true;
 #endif
 }
-struct JumpAllocator : Xbyak::Allocator {
+inline struct JumpAllocator : Xbyak::Allocator {
     virtual uint8_t* alloc(size_t size) {
         void* ptr = Xbyak::AlignedMalloc(size, Xbyak::inner::ALIGN_PAGE_SIZE);
         set_memory_prot(ptr, size, MemoryProt::PROTECT_RWE);
@@ -269,7 +269,7 @@ struct JumpAllocator : Xbyak::Allocator {
     virtual void free(uint8_t* p) {}
     virtual bool useProtect() const { return false; }
 } default_jmp_allocator;
-struct TrampolineAllocator : Xbyak::Allocator {
+inline struct TrampolineAllocator : Xbyak::Allocator {
     virtual uint8_t* alloc(size_t size) {
         void* ptr = Xbyak::AlignedMalloc(size, Xbyak::inner::ALIGN_PAGE_SIZE);
         set_memory_prot(ptr, size, MemoryProt::PROTECT_RWE);

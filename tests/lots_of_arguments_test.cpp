@@ -11,7 +11,7 @@ constexpr std::tuple<int, float, long long, double, short, char, int, long doubl
         return testing::AssertionFailure() << "not equal at " << x; \
     }
 
-testing::AssertionResult check_equality(decltype(test_args) rhs) {
+inline testing::AssertionResult check_equality(decltype(test_args) rhs) {
     EQUALITY_CHECK(0);
     EQUALITY_CHECK(1);
     EQUALITY_CHECK(2);
@@ -35,17 +35,20 @@ DECLARE_SIZE_ENLARGER();
 
 #undef EQUALITY_CHECK
 
-void NO_OPTIMIZE
+class A {
+public:
+    NO_OPTIMIZE static void
 #ifdef KTHOOK_32
-    TEST_CCONV
+        TEST_CCONV
 #endif
-    test_func(int v1, float v2, long long v3, double v4, short v5, char v6, int v7, long double v8, float v9, int v10,
-              int v11, long v12, long long v13, int v14, int v15, int v16) {
-    SIZE_ENLARGER();
-}
+        test_func(int v1, float v2, long long v3, double v4, short v5, char v6, int v7, long double v8, float v9,
+                  int v10, int v11, long v12, long long v13, int v14, int v15, int v16) {
+        SIZE_ENLARGER();
+    }
+};
 
-TEST(KthookSimpleLotsArgsTest, HandlesKthookSimple) {
-    kthook::kthook_simple<decltype(&test_func)> hook{&test_func};
+TEST(KthookSimpleLotsArgsTest, CREATE_NAME(HandlesKthookSimple)) {
+    kthook::kthook_simple<decltype(&A::test_func)> hook{&A::test_func};
     hook.install();
 
     int counter = 0;
@@ -54,29 +57,29 @@ TEST(KthookSimpleLotsArgsTest, HandlesKthookSimple) {
         ++counter;
         hook.get_trampoline()(args...);
     });
-    std::apply(&test_func, test_args);
+    std::apply(&A::test_func, test_args);
     EXPECT_EQ(counter, 1);
 }
 
-TEST(KthookSignalLotsArgsTest, HandlesKthookSignalBefore) {
-    kthook::kthook_signal<decltype(&test_func)> hook{&test_func};
+TEST(KthookSignalLotsArgsTest, CREATE_NAME(HandlesKthookSignalBefore)) {
+    kthook::kthook_signal<decltype(&A::test_func)> hook{&A::test_func};
     int counter = 0;
     hook.before += [&counter](const auto& hook, auto&&... args) {
         EXPECT_TRUE(check_equality(decltype(test_args){args...}));
         ++counter;
         return true;
     };
-    std::apply(&test_func, test_args);
+    std::apply(&A::test_func, test_args);
     EXPECT_EQ(counter, 1);
 }
 
-TEST(KthookSignalLotsArgsTest, HandlesKthookSignalAfter) {
-    kthook::kthook_signal<decltype(&test_func)> hook{&test_func};
+TEST(KthookSignalLotsArgsTest, CREATE_NAME(HandlesKthookSignalAfter)) {
+    kthook::kthook_signal<decltype(&A::test_func)> hook{&A::test_func};
     int counter = 0;
     hook.after += [&counter](const auto& hook, auto&&... args) {
         EXPECT_TRUE(check_equality(decltype(test_args){args...}));
         ++counter;
     };
-    std::apply(&test_func, test_args);
+    std::apply(&A::test_func, test_args);
     EXPECT_EQ(counter, 1);
 }

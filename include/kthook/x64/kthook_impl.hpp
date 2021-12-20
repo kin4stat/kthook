@@ -218,8 +218,8 @@ class kthook_simple {
     using function = detail::traits::function_traits<FunctionPtr>;
     using Args = typename function::args;
     using Ret = typename function::return_type;
-    using function_ptr = detail::traits::function_connect_ptr_t<Ret, Args>;
-    using converted_args = detail::traits::add_refs_t<detail::traits::convert_refs_t<Args>>;
+    using function_ptr = typename detail::traits::function_connect_ptr_t<Ret, Args>;
+    using converted_args = typename detail::traits::add_refs_t<detail::traits::convert_refs_t<Args>>;
     using cb_type = std::function<
         detail::traits::function_connect_t<Ret, detail::traits::tuple_cat_t<const kthook_simple&, converted_args>>>;
 
@@ -292,17 +292,19 @@ public:
     void set_dest(function_ptr address) { set_dest(reinterpret_cast<std::uintptr_t>(address)); }
 
     std::uintptr_t get_return_address() const {
-        return (using_ptr_to_return_address) ? *last_return_address : reinterpret_cast<std::uintptr_t>(last_return_address);
+        return (using_ptr_to_return_address) ? *last_return_address
+                                             : reinterpret_cast<std::uintptr_t>(last_return_address);
     }
 
     std::uintptr_t* get_return_address_ptr() const {
-        return (using_ptr_to_return_address) ? last_return_address : reinterpret_cast<std::uintptr_t*>(&last_return_address);
+        return (using_ptr_to_return_address) ? last_return_address
+                                             : reinterpret_cast<std::uintptr_t*>(&last_return_address);
     }
 
     const CPU_Context& get_context() const { return context; }
 
-    const function_ptr get_trampoline() const {
-        return reinterpret_cast<const function_ptr>(trampoline_gen->getCode());
+    function_ptr get_trampoline() const {
+        return reinterpret_cast<function_ptr>(const_cast<std::uint8_t*>(trampoline_gen->getCode()));
     }
     cb_type& get_callback() { return callback; }
 
@@ -366,35 +368,61 @@ private:
             reinterpret_cast<void*>(&detail::common_relay_generator<kthook_simple, Ret, head, tail, Args>::relay);
         if constexpr (args_info.register_idx_if_full == -1) {
             using_ptr_to_return_address = false;
+
+            // save context
             jump_gen->mov(rax, rcx);
             jump_gen->mov(ptr[reinterpret_cast<std::uintptr_t>(&context.rcx)], rax);
+
+            // pop out return address
             jump_gen->pop(rcx);
+
 #ifdef KTHOOK_64_WIN
-            jump_gen->add(rsp, static_cast<std::uint32_t>(sizeof(void*) * (registers.size() - 1)));
-#endif
             jump_gen->mov(rax, reinterpret_cast<std::uintptr_t>(this));
+            // set rsp to next stack argument pointer
+            jump_gen->add(rsp, static_cast<std::uint32_t>(sizeof(void*) * (registers.size() - 1)));
+            // push our hook to the stack
             jump_gen->mov(ptr[rsp], rax);
+#else
+            jump_gen->mov(rax, reinterpret_cast<std::uintptr_t>(this));
+            // push our hook to the stack
+            jump_gen->push(std::uintptr_t(0));
+            jump_gen->push(std::uintptr_t(0));
+            jump_gen->push(std::uintptr_t(0));
+            jump_gen->push(rax);
+#endif
+
 #ifdef KTHOOK_64_WIN
+            // return the rsp to its initial state
             jump_gen->sub(rsp, static_cast<std::uint32_t>(sizeof(void*) * (registers.size())));
 #else
-            jump_gen->sub(rsp, 8);
+
 #endif
-            jump_gen->push(rcx);
-            jump_gen->mov(rax, ptr[rsp]);
+            // save return address
+            jump_gen->mov(rax, rcx);
             jump_gen->mov(ptr[reinterpret_cast<std::uintptr_t>(&last_return_address)], rax);
+            // push our return address
+            jump_gen->mov(rax, ret_addr);
+            jump_gen->push(rax);
+
+            // restore context
             jump_gen->mov(rax, ptr[reinterpret_cast<std::uintptr_t>(&context.rcx)]);
             jump_gen->mov(rcx, rax);
-            jump_gen->mov(rax, ret_addr);
-            jump_gen->mov(ptr[rsp], rax);
+
             jump_gen->jmp(ptr[rip]);
             jump_gen->db(reinterpret_cast<std::uintptr_t>(relay_ptr), 8);
             jump_gen->L(ret_addr);
+#ifdef KTHOOK_64_WIN
             jump_gen->add(rsp, sizeof(void*));
+#else
+            jump_gen->add(rsp, 32);
+#endif
+            // push original return address and return
             jump_gen->mov(ptr[reinterpret_cast<std::uintptr_t>(&context.rax)], rax);
             jump_gen->mov(rax, ptr[reinterpret_cast<std::uintptr_t>(&last_return_address)]);
             jump_gen->push(rax);
             jump_gen->mov(rax, ptr[reinterpret_cast<std::uintptr_t>(&context.rax)]);
             jump_gen->ret();
+
         } else {
             using_ptr_to_return_address = true;
             jump_gen->mov(ptr[reinterpret_cast<std::uintptr_t>(&context.rax)], rax);
@@ -451,7 +479,7 @@ private:
 
     hook_info info;
     cb_type callback;
-    std::uintptr_t* last_return_address = nullptr;
+    mutable std::uintptr_t* last_return_address = nullptr;
     std::size_t hook_size = 0;
     std::unique_ptr<Xbyak::CodeGenerator> jump_gen;
     std::unique_ptr<Xbyak::CodeGenerator> trampoline_gen;
@@ -528,16 +556,20 @@ public:
     void set_dest(function_ptr address) { set_dest(reinterpret_cast<std::uintptr_t>(address)); }
 
     std::uintptr_t get_return_address() const {
-        return (using_ptr_to_return_address) ? *last_return_address : reinterpret_cast<std::uintptr_t>(last_return_address);
+        return (using_ptr_to_return_address) ? *last_return_address
+                                             : reinterpret_cast<std::uintptr_t>(last_return_address);
     }
 
     std::uintptr_t* get_return_address_ptr() const {
-        return (using_ptr_to_return_address) ? last_return_address : reinterpret_cast<std::uintptr_t*>(&last_return_address);
+        return (using_ptr_to_return_address) ? last_return_address
+                                             : reinterpret_cast<std::uintptr_t*>(&last_return_address);
     }
 
     const CPU_Context& get_context() const { return context; }
 
-    const function_ptr get_trampoline() { return reinterpret_cast<const function_ptr>(trampoline_gen->getCode()); }
+    function_ptr get_trampoline() const {
+        return reinterpret_cast<function_ptr>(const_cast<std::uint8_t*>(trampoline_gen->getCode()));
+    }
 
     before_t before;
     after_t after;
@@ -602,37 +634,62 @@ private:
             reinterpret_cast<void*>(&detail::signal_relay_generator<kthook_signal, Ret, head, tail, Args>::relay);
         if constexpr (args_info.register_idx_if_full == -1) {
             using_ptr_to_return_address = false;
+
+            // save context
             jump_gen->mov(rax, rcx);
             jump_gen->mov(ptr[reinterpret_cast<std::uintptr_t>(&context.rcx)], rax);
+
+            // pop out return address
             jump_gen->pop(rcx);
+
 #ifdef KTHOOK_64_WIN
-            jump_gen->add(rsp, static_cast<std::uint32_t>(sizeof(void*) * (registers.size() - 1)));
-#endif
             jump_gen->mov(rax, reinterpret_cast<std::uintptr_t>(this));
+            // set rsp to next stack argument pointer
+            jump_gen->add(rsp, static_cast<std::uint32_t>(sizeof(void*) * (registers.size() - 1)));
+            // push our hook to the stack
             jump_gen->mov(ptr[rsp], rax);
+#else
+            jump_gen->mov(rax, reinterpret_cast<std::uintptr_t>(this));
+            // push our hook to the stack
+            jump_gen->push(std::uintptr_t(0));
+            jump_gen->push(std::uintptr_t(0));
+            jump_gen->push(std::uintptr_t(0));
+            jump_gen->push(rax);
+#endif
+
 #ifdef KTHOOK_64_WIN
+            // return the rsp to its initial state
             jump_gen->sub(rsp, static_cast<std::uint32_t>(sizeof(void*) * (registers.size())));
 #else
-            jump_gen->sub(rsp, 8);
+
 #endif
-            jump_gen->push(rcx);
-            jump_gen->mov(rax, ptr[rsp]);
+            // save return address
+            jump_gen->mov(rax, rcx);
             jump_gen->mov(ptr[reinterpret_cast<std::uintptr_t>(&last_return_address)], rax);
+            // push our return address
+            jump_gen->mov(rax, ret_addr);
+            jump_gen->push(rax);
+
+            // restore context
             jump_gen->mov(rax, ptr[reinterpret_cast<std::uintptr_t>(&context.rcx)]);
             jump_gen->mov(rcx, rax);
-            jump_gen->mov(rax, ret_addr);
-            jump_gen->mov(ptr[rsp], rax);
+
             jump_gen->jmp(ptr[rip]);
             jump_gen->db(reinterpret_cast<std::uintptr_t>(relay_ptr), 8);
             jump_gen->L(ret_addr);
+#ifdef KTHOOK_64_WIN
             jump_gen->add(rsp, sizeof(void*));
+#else
+            jump_gen->add(rsp, 32);
+#endif
+            // push original return address and return
             jump_gen->mov(ptr[reinterpret_cast<std::uintptr_t>(&context.rax)], rax);
             jump_gen->mov(rax, ptr[reinterpret_cast<std::uintptr_t>(&last_return_address)]);
             jump_gen->push(rax);
             jump_gen->mov(rax, ptr[reinterpret_cast<std::uintptr_t>(&context.rax)]);
             jump_gen->ret();
-        }
-        else {
+
+        } else {
             using_ptr_to_return_address = true;
             jump_gen->mov(ptr[reinterpret_cast<std::uintptr_t>(&context.rax)], rax);
             jump_gen->mov(rax, rsp);
@@ -687,7 +744,7 @@ private:
     }
 
     hook_info info;
-    std::uintptr_t* last_return_address = nullptr;
+    mutable std::uintptr_t* last_return_address = nullptr;
     std::size_t hook_size = 0;
     std::unique_ptr<Xbyak::CodeGenerator> jump_gen;
     std::unique_ptr<Xbyak::CodeGenerator> trampoline_gen;
