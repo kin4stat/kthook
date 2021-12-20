@@ -218,8 +218,9 @@ class kthook_simple {
     using function = detail::traits::function_traits<FunctionPtr>;
     using Args = typename function::args;
     using Ret = typename function::return_type;
-    using function_ptr = detail::traits::function_connect_ptr_t<Ret, Args>;
-    using converted_args = detail::traits::add_refs_t<detail::traits::convert_refs_t<Args>>;
+    using function_ptr = typename detail::traits::function_connect_ptr_t<Ret, Args>;
+    using const_function_ptr = typename detail::traits::const_function_connect_ptr_t<Ret, Args>;
+    using converted_args = typename detail::traits::add_refs_t<detail::traits::convert_refs_t<Args>>;
     using cb_type = std::function<
         detail::traits::function_connect_t<Ret, detail::traits::tuple_cat_t<const kthook_simple&, converted_args>>>;
 
@@ -301,8 +302,8 @@ public:
 
     const CPU_Context& get_context() const { return context; }
 
-    const function_ptr get_trampoline() const {
-        return reinterpret_cast<const function_ptr>(trampoline_gen->getCode());
+    const_function_ptr get_trampoline() const {
+        return reinterpret_cast<const_function_ptr>(trampoline_gen->getCode());
     }
     cb_type& get_callback() { return callback; }
 
@@ -489,6 +490,7 @@ class kthook_signal {
     using Args = detail::traits::convert_refs_t<typename function::args>;
     using Ret = detail::traits::convert_ref_t<typename function::return_type>;
     using function_ptr = typename detail::traits::function_connect_ptr_t<Ret, Args>;
+    using const_function_ptr = typename detail::traits::const_function_connect_ptr_t<Ret, Args>;
     using before_t = typename detail::traits::on_before_t<kthook_signal, Ret, Args>;
     using after_t = typename detail::traits::on_after_t<kthook_signal, Ret, Args>;
 
@@ -559,7 +561,7 @@ public:
 
     const CPU_Context& get_context() const { return context; }
 
-    const function_ptr get_trampoline() { return reinterpret_cast<const function_ptr>(trampoline_gen->getCode()); }
+    const_function_ptr get_trampoline() { return reinterpret_cast<const_function_ptr>(trampoline_gen->getCode()); }
 
     before_t before;
     after_t after;
