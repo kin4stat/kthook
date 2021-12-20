@@ -84,13 +84,6 @@ struct function_connect_ptr<Ret, std::tuple<Args...>> {
     using type = Ret (*)(Args...);
 };
 
-template <typename Ret, typename Tuple>
-struct const_function_connect_ptr;
-template <typename Ret, typename... Args>
-struct const_function_connect_ptr<Ret, std::tuple<Args...>> {
-    using type = Ret(*const)(Args...);
-};
-
 template <class R, class Tuple>
 struct function_connect;
 template <class R, class... Types>
