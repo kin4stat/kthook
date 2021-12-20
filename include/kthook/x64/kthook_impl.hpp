@@ -474,7 +474,7 @@ private:
 
     hook_info info;
     cb_type callback;
-    std::uintptr_t* last_return_address = nullptr;
+    mutable std::uintptr_t* last_return_address = nullptr;
     std::size_t hook_size = 0;
     std::unique_ptr<Xbyak::CodeGenerator> jump_gen;
     std::unique_ptr<Xbyak::CodeGenerator> trampoline_gen;
@@ -733,7 +733,7 @@ private:
     }
 
     hook_info info;
-    std::uintptr_t* last_return_address = nullptr;
+    mutable std::uintptr_t* last_return_address = nullptr;
     std::size_t hook_size = 0;
     std::unique_ptr<Xbyak::CodeGenerator> jump_gen;
     std::unique_ptr<Xbyak::CodeGenerator> trampoline_gen;
