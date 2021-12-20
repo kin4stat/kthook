@@ -53,7 +53,7 @@ DECLARE_SIZE_ENLARGER();
 
 class A {
 public:
-    NO_OPTIMIZE static  BigAggregate
+    NO_OPTIMIZE static BigAggregate
 #ifdef KTHOOK_32
         TEST_CCONV
 #endif
@@ -78,8 +78,6 @@ public:
         return value;
     }
 };
-
-
 
 TEST(KthookSimpleTest, CREATE_NAME(BigAggregate)) {
     kthook::kthook_simple<decltype(&A::big_test_func)> hook{&A::big_test_func};

@@ -9,7 +9,7 @@ DECLARE_SIZE_ENLARGER();
 
 class A {
 public:
-    NO_OPTIMIZE static  int
+    NO_OPTIMIZE static int
 #ifdef KTHOOK_32
         TEST_CCONV
 #endif

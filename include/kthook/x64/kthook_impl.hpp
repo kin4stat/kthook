@@ -292,11 +292,13 @@ public:
     void set_dest(function_ptr address) { set_dest(reinterpret_cast<std::uintptr_t>(address)); }
 
     std::uintptr_t get_return_address() const {
-        return (using_ptr_to_return_address) ? *last_return_address : reinterpret_cast<std::uintptr_t>(last_return_address);
+        return (using_ptr_to_return_address) ? *last_return_address
+                                             : reinterpret_cast<std::uintptr_t>(last_return_address);
     }
 
     std::uintptr_t* get_return_address_ptr() const {
-        return (using_ptr_to_return_address) ? last_return_address : reinterpret_cast<std::uintptr_t*>(&last_return_address);
+        return (using_ptr_to_return_address) ? last_return_address
+                                             : reinterpret_cast<std::uintptr_t*>(&last_return_address);
     }
 
     const CPU_Context& get_context() const { return context; }
@@ -365,7 +367,6 @@ private:
         void* relay_ptr =
             reinterpret_cast<void*>(&detail::common_relay_generator<kthook_simple, Ret, head, tail, Args>::relay);
         if constexpr (args_info.register_idx_if_full == -1) {
-
             using_ptr_to_return_address = false;
 
             // save context
@@ -374,7 +375,7 @@ private:
 
             // pop out return address
             jump_gen->pop(rcx);
-            
+
 #ifdef KTHOOK_64_WIN
             jump_gen->mov(rax, reinterpret_cast<std::uintptr_t>(this));
             // set rsp to next stack argument pointer
@@ -389,7 +390,7 @@ private:
             jump_gen->push(std::uintptr_t(0));
             jump_gen->push(rax);
 #endif
-            
+
 #ifdef KTHOOK_64_WIN
             // return the rsp to its initial state
             jump_gen->sub(rsp, static_cast<std::uint32_t>(sizeof(void*) * (registers.size())));
@@ -555,11 +556,13 @@ public:
     void set_dest(function_ptr address) { set_dest(reinterpret_cast<std::uintptr_t>(address)); }
 
     std::uintptr_t get_return_address() const {
-        return (using_ptr_to_return_address) ? *last_return_address : reinterpret_cast<std::uintptr_t>(last_return_address);
+        return (using_ptr_to_return_address) ? *last_return_address
+                                             : reinterpret_cast<std::uintptr_t>(last_return_address);
     }
 
     std::uintptr_t* get_return_address_ptr() const {
-        return (using_ptr_to_return_address) ? last_return_address : reinterpret_cast<std::uintptr_t*>(&last_return_address);
+        return (using_ptr_to_return_address) ? last_return_address
+                                             : reinterpret_cast<std::uintptr_t*>(&last_return_address);
     }
 
     const CPU_Context& get_context() const { return context; }
@@ -630,7 +633,6 @@ private:
         void* relay_ptr =
             reinterpret_cast<void*>(&detail::signal_relay_generator<kthook_signal, Ret, head, tail, Args>::relay);
         if constexpr (args_info.register_idx_if_full == -1) {
-
             using_ptr_to_return_address = false;
 
             // save context
@@ -687,8 +689,7 @@ private:
             jump_gen->mov(rax, ptr[reinterpret_cast<std::uintptr_t>(&context.rax)]);
             jump_gen->ret();
 
-        }
-        else {
+        } else {
             using_ptr_to_return_address = true;
             jump_gen->mov(ptr[reinterpret_cast<std::uintptr_t>(&context.rax)], rax);
             jump_gen->mov(rax, rsp);

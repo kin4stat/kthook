@@ -37,12 +37,12 @@ DECLARE_SIZE_ENLARGER();
 
 class A {
 public:
-    NO_OPTIMIZE static  void
+    NO_OPTIMIZE static void
 #ifdef KTHOOK_32
         TEST_CCONV
 #endif
-        test_func(int v1, float v2, long long v3, double v4, short v5, char v6, int v7, long double v8, float v9, int v10,
-            int v11, long v12, long long v13, int v14, int v15, int v16) {
+        test_func(int v1, float v2, long long v3, double v4, short v5, char v6, int v7, long double v8, float v9,
+                  int v10, int v11, long v12, long long v13, int v14, int v15, int v16) {
         SIZE_ENLARGER();
     }
 };
