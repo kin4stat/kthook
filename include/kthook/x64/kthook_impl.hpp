@@ -386,6 +386,7 @@ private:
             // push our hook to the stack
             jump_gen->push(std::uintptr_t(0));
             jump_gen->push(std::uintptr_t(0));
+            jump_gen->push(std::uintptr_t(0));
             jump_gen->push(rax);
 #endif
             
@@ -409,7 +410,11 @@ private:
             jump_gen->jmp(ptr[rip]);
             jump_gen->db(reinterpret_cast<std::uintptr_t>(relay_ptr), 8);
             jump_gen->L(ret_addr);
+#ifdef KTHOOK_64_WIN
             jump_gen->add(rsp, sizeof(void*));
+#else
+            jump_gen->add(rsp, 32);
+#endif
             // push original return address and return
             jump_gen->mov(ptr[reinterpret_cast<std::uintptr_t>(&context.rax)], rax);
             jump_gen->mov(rax, ptr[reinterpret_cast<std::uintptr_t>(&last_return_address)]);
@@ -646,6 +651,7 @@ private:
             // push our hook to the stack
             jump_gen->push(std::uintptr_t(0));
             jump_gen->push(std::uintptr_t(0));
+            jump_gen->push(std::uintptr_t(0));
             jump_gen->push(rax);
 #endif
 
@@ -669,7 +675,11 @@ private:
             jump_gen->jmp(ptr[rip]);
             jump_gen->db(reinterpret_cast<std::uintptr_t>(relay_ptr), 8);
             jump_gen->L(ret_addr);
+#ifdef KTHOOK_64_WIN
             jump_gen->add(rsp, sizeof(void*));
+#else
+            jump_gen->add(rsp, 32);
+#endif
             // push original return address and return
             jump_gen->mov(ptr[reinterpret_cast<std::uintptr_t>(&context.rax)], rax);
             jump_gen->mov(rax, ptr[reinterpret_cast<std::uintptr_t>(&last_return_address)]);

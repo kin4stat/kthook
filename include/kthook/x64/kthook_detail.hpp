@@ -127,7 +127,7 @@ template <typename HookType>
 struct SystemVAbiTrick {
     HookType* ptr;
 private:
-    void *junk, *junk2;
+    void *junk1, *junk2, *junk3;
 };
 
 #endif
