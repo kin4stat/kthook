@@ -115,9 +115,6 @@ struct function_traits<Ret(Args...)> {
 };
 
 template <typename Ret, typename... Args>
-using const_function_connect_ptr_t = typename const_function_connect_ptr<Ret, Args...>::type;
-
-template <typename Ret, typename... Args>
 using function_connect_ptr_t = typename function_connect_ptr<Ret, Args...>::type;
 
 template <class R, class... Types>
