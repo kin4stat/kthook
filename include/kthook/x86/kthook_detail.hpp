@@ -24,17 +24,6 @@ enum class cconv {
     cstdcall,
 };
 
-template <typename Tuple>
-struct get_register_args_count {
-    using first_el = std::tuple_element_t<0, Tuple>;
-    using second_el = std::tuple_element_t<1, Tuple>;
-
-    static constexpr bool first =
-        (std::is_pointer_v<first_el> || std::is_integral_v<first_el>)&&(sizeof(first_el) <= 4);
-    static constexpr bool second = (std::is_pointer_v<second_el> ||
-                                    std::is_integral_v<second_el>)&&(sizeof(first_el) <= 4 && sizeof(second_el) <= 4);
-};
-
 template <cconv Conv, typename Ret, typename Tuple>
 struct function_connect_ptr;
 template <typename Ret, typename... Args>
@@ -114,6 +103,19 @@ struct function_traits<Ret(CFASTCALL*)(Args...)> {
     using return_type = Ret;
 };
 
+template <cconv Conv>
+struct get_registers_count {
+    static constexpr auto value = 0;
+};
+template <>
+struct get_registers_count<cconv::cfastcall> {
+    static constexpr auto value = 2;
+};
+template <>
+struct get_registers_count<cconv::cthiscall> {
+    static constexpr auto value = 1;
+};
+
 template <cconv Conv, typename Ret, typename... Args>
 using function_connect_ptr_t = typename function_connect_ptr<Conv, Ret, Args...>::type;
 
@@ -127,16 +129,23 @@ template <class... Types>
 using convert_refs_t = typename convert_refs<Types...>::type;
 }  // namespace traits
 
+template <typename Ret>
+constexpr bool is_return_value_needs_stack() {
+    if constexpr (std::is_void_v<Ret>) return false;
+
+    return (!(std::is_trivial_v<Ret> && std::is_standard_layout_v<Ret> && sizeof(Ret) <= 8));
+}
+
 template <typename HookPtrType, traits::cconv Convention, typename Ret, typename... Args>
 struct signal_relay_generator;
 
 template <typename HookPtrType, typename Ret, typename... Args>
 struct signal_relay_generator<HookPtrType, traits::cconv::ccdecl, Ret, std::tuple<Args...>> {
-    static Ret CCDECL relay(HookPtrType* this_hook, std::uintptr_t retaddr, Args... args) {
+    static Ret CCDECL relay(HookPtrType* this_hook, Args... args) {
         using source_t = Ret(CCDECL*)(Args...);
         return signal_relay<HookPtrType, Ret, Args...>(this_hook, args...);
     }
-};
+};  // namespace detail
 
 template <typename HookPtrType, typename Ret, typename... Args>
 struct signal_relay_generator<HookPtrType, traits::cconv::cstdcall, Ret, std::tuple<Args...>> {
@@ -171,11 +180,11 @@ struct relay_generator;
 
 template <typename HookPtrType, typename Ret, typename... Args>
 struct relay_generator<HookPtrType, traits::cconv::ccdecl, Ret, std::tuple<Args...>> {
-    static Ret CCDECL relay(HookPtrType* this_hook, std::uintptr_t retaddr, Args... args) {
+    static Ret CCDECL relay(HookPtrType* this_hook, Args... args) {
         auto& cb = this_hook->get_callback();
         return common_relay<decltype(cb), HookPtrType, Ret, Args...>(cb, this_hook, args...);
     }
-};
+};  // namespace kthook
 
 template <typename HookPtrType, typename Ret, typename... Args>
 struct relay_generator<HookPtrType, traits::cconv::cstdcall, Ret, std::tuple<Args...>> {
