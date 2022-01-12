@@ -1,12 +1,7 @@
 cmake_minimum_required(VERSION 3.15)
 project(kthook)
 
-set(CMAKE_C_FLAGS -m32)
-set(CMAKE_CXX_FLAGS -m32)
-
-if (NOT DEFINED KTHOOK_TEST)
-  set(KTHOOK_TEST FALSE)
-endif()
+OPTION(KTHOOK_TEST "Compile tests" OFF)
 
 add_subdirectory(ktsignal)
 

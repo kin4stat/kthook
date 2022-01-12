@@ -288,47 +288,64 @@ private:
             jump_gen->mov(esp, ptr[&last_return_address]);
             jump_gen->mov(ptr[reinterpret_cast<std::uintptr_t>(&context.esp)], esp);
         }
-        constexpr bool can_be_pushed = (function::args_count > 0) && (std::is_integral_v<std::tuple_element_t<0, Args>>, std::is_pointer_v<std::tuple_element_t<0, Args>>);
+        constexpr bool can_be_pushed = []() {
+            if constexpr (function::args_count > 0) {
+                using first = std::tuple_element_t<0, Args>;
+                return std::is_integral_v<first> || std::is_pointer_v<first>;
+            }
+            return false;
+        }();
+        constexpr bool is_thiscall = (function::convention == detail::traits::cconv::cthiscall);
 #ifdef _WIN32
-        if constexpr (function::convention != detail::traits::cconv::ccdecl) {
-            jump_gen->pop(eax);
+        jump_gen->pop(eax);
+        if constexpr (!std::is_void_v<Ret>) {
+            if constexpr (sizeof(Ret) > 8 || !std::is_trivial_v<Ret>) {
+                jump_gen->pop(eax);
+                jump_gen->push(reinterpret_cast<std::uintptr_t>(this));
+                jump_gen->push(eax);
+                jump_gen->mov(eax, ptr[reinterpret_cast<std::uintptr_t>(&last_return_address)]);
+            } else {
+                if constexpr (is_thiscall) {
+                    if constexpr (can_be_pushed) {
+                        jump_gen->push(ecx);
+                    }
+                }
+                jump_gen->push(reinterpret_cast<std::uintptr_t>(this));
+            }
+        } else {
+            if constexpr (is_thiscall) {
+                if constexpr (can_be_pushed) {
+                    jump_gen->push(ecx);
+                }
+            }
+            jump_gen->push(reinterpret_cast<std::uintptr_t>(this));
         }
-        jump_gen->push(reinterpret_cast<std::uintptr_t>(this));
 #else
         jump_gen->pop(eax);
         // if Ret is class or union, memory for return value as first argument(hidden)
         // so we need to push our hook pointer after this hidden argument
         if constexpr (!std::is_void_v<Ret>) {
             if constexpr (std::is_class_v<Ret> || std::is_union_v<Ret> || sizeof(Ret) > 8) {
-                if constexpr (function::convention == detail::traits::cconv::cthiscall) {
-                    jump_gen->pop(eax);
-                    if constexpr (can_be_pushed) {
-                        jump_gen->push(ecx);
-                    }
+                if constexpr (is_thiscall) {
                     jump_gen->push(reinterpret_cast<std::uintptr_t>(this));
-                    jump_gen->push(eax);
-                    jump_gen->mov(eax, ptr[reinterpret_cast<std::uintptr_t>(&last_return_address)]);
-                }
-                else {
+                    jump_gen->push(ecx);
+                } else {
                     jump_gen->pop(eax);
                     jump_gen->push(reinterpret_cast<std::uintptr_t>(this));
                     jump_gen->push(eax);
                     jump_gen->mov(eax, ptr[reinterpret_cast<std::uintptr_t>(&last_return_address)]);
                 }
 
-            }
-            else {
-                if constexpr (function::convention == detail::traits::cconv::cthiscall) {
+            } else {
+                if constexpr (is_thiscall) {
                     if constexpr (can_be_pushed) {
                         jump_gen->push(ecx);
                     }
                 }
                 jump_gen->push(reinterpret_cast<std::uintptr_t>(this));
-
             }
-        }
-        else {
-            if constexpr (function::convention == detail::traits::cconv::cthiscall) {
+        } else {
+            if constexpr (is_thiscall) {
                 if constexpr (can_be_pushed) {
                     jump_gen->push(ecx);
                 }
@@ -337,21 +354,18 @@ private:
         }
         static_assert(function::convention != detail::traits::cconv::cfastcall, "linux fastcall not supported");
 #endif
-        void* relay_ptr = reinterpret_cast<void*>(
-            &detail::relay_generator<kthook_simple, function::convention, Ret, Args>::relay);
+        void* relay_ptr =
+            reinterpret_cast<void*>(&detail::relay_generator<kthook_simple, function::convention, Ret, Args>::relay);
         if constexpr (function::convention == detail::traits::cconv::ccdecl) {
             // call relay for restoring stack pointer after call
             jump_gen->call(relay_ptr);
             jump_gen->add(esp, 4);
-#ifndef _WIN32
             jump_gen->mov(ptr[reinterpret_cast<std::uintptr_t>(&context.ecx)], ecx);
             jump_gen->mov(ecx, ptr[&last_return_address]);
             jump_gen->push(ecx);
             jump_gen->mov(ecx, ptr[reinterpret_cast<std::uintptr_t>(&context.ecx)]);
-#endif
             jump_gen->ret();
-        }
-        else {
+        } else {
             jump_gen->push(eax);
             jump_gen->jmp(relay_ptr);
         }
@@ -371,7 +385,7 @@ private:
                 this->relay_jump = generate_relay_jump();
                 this->hook_size = detail::detect_hook_size(info.hook_address);
                 if (!set_memory_prot(reinterpret_cast<void*>(info.hook_address), this->hook_size,
-                    detail::MemoryProt::PROTECT_RWE))
+                                     detail::MemoryProt::PROTECT_RWE))
                     return false;
                 info.original_code = std::make_unique<unsigned char[]>(this->hook_size);
                 std::memcpy(info.original_code.get(), reinterpret_cast<void*>(info.hook_address), this->hook_size);
@@ -384,16 +398,14 @@ private:
                 patch.operand = relative;
                 std::memcpy(reinterpret_cast<void*>(info.hook_address), &patch, sizeof(patch));
                 memset(reinterpret_cast<void*>(info.hook_address + sizeof(patch)), 0x90,
-                    this->hook_size - sizeof(patch));
+                       this->hook_size - sizeof(patch));
                 if (!detail::set_memory_prot(reinterpret_cast<void*>(info.hook_address), this->hook_size,
-                    detail::MemoryProt::PROTECT_RE))
+                                             detail::MemoryProt::PROTECT_RE))
                     return false;
-            }
-            else {
+            } else {
                 jump_gen->rewrite(0, original, 8);
             }
-        }
-        else if (relay_jump) {
+        } else if (relay_jump) {
             std::memcpy(reinterpret_cast<void*>(&original), relay_jump, sizeof(original));
             jump_gen->rewrite(0, 0x9090909090909090, 8);
         }
@@ -403,7 +415,7 @@ private:
 
     cb_type callback{};
     hook_info info;
-    mutable std::uintptr_t last_return_address{ 0 };
+    mutable std::uintptr_t last_return_address{0};
     std::size_t hook_size{0};
     std::unique_ptr<Xbyak::CodeGenerator> jump_gen{
         std::make_unique<Xbyak::CodeGenerator>(Xbyak::DEFAULT_MAX_CODE_SIZE, nullptr, &detail::default_jmp_allocator)};
@@ -517,48 +529,64 @@ private:
             jump_gen->mov(ptr[reinterpret_cast<std::uintptr_t>(&context.esp)], esp);
         }
         // pop return address out
-        constexpr bool can_be_pushed = (function::args_count > 0) && (std::is_integral_v<std::tuple_element_t<0, Args>>, std::is_pointer_v<std::tuple_element_t<0, Args>>);
-#ifdef _WIN32
-        if constexpr (function::convention != detail::traits::cconv::ccdecl) {
-            jump_gen->pop(eax);
-        }
-        jump_gen->push(reinterpret_cast<std::uintptr_t>(this));
-#else
-        jump_gen->pop(eax);
-        // if Ret is class or union, memory for return value as first argument(hidden)
-        // so we need to push our hook pointer after this hidden argument
-        if constexpr (!std::is_void_v<Ret>) {
-            if constexpr (detail::traits::get_registers_count<function::convention>::value == 0 &&
-                (std::is_class_v<Ret> || std::is_union_v<Ret> || sizeof(Ret) > 8)) {
-                if constexpr (function::convention == detail::traits::cconv::cthiscall) {
-                    jump_gen->pop(eax);
-                    if constexpr (can_be_pushed) {
-                        jump_gen->push(ecx);
-                    }
-                    jump_gen->push(reinterpret_cast<std::uintptr_t>(this));
-                    jump_gen->push(eax);
-                    jump_gen->mov(eax, ptr[reinterpret_cast<std::uintptr_t>(&last_return_address)]);
-                }
-                else {
-                    jump_gen->pop(eax);
-                    jump_gen->push(reinterpret_cast<std::uintptr_t>(this));
-                    jump_gen->push(eax);
-                    jump_gen->mov(eax, ptr[reinterpret_cast<std::uintptr_t>(&last_return_address)]);
-                }
-
+        constexpr bool can_be_pushed = []() {
+            if constexpr (function::args_count > 0) {
+                using first = std::tuple_element_t<0, Args>;
+                return std::is_integral_v<first> || std::is_pointer_v<first>;
             }
-            else {
-                if constexpr (function::convention == detail::traits::cconv::cthiscall) {
+            return false;
+        }();
+        constexpr bool is_thiscall = (function::convention == detail::traits::cconv::cthiscall);
+#ifdef _WIN32
+        jump_gen->pop(eax);
+        if constexpr (!std::is_void_v<Ret>) {
+            if constexpr (sizeof(Ret) > 8 || !std::is_trivial_v<Ret>) {
+                jump_gen->pop(eax);
+                jump_gen->push(reinterpret_cast<std::uintptr_t>(this));
+                jump_gen->push(eax);
+                jump_gen->mov(eax, ptr[reinterpret_cast<std::uintptr_t>(&last_return_address)]);
+            } else {
+                if constexpr (is_thiscall) {
                     if constexpr (can_be_pushed) {
                         jump_gen->push(ecx);
                     }
                 }
                 jump_gen->push(reinterpret_cast<std::uintptr_t>(this));
-
             }
+        } else {
+            if constexpr (is_thiscall) {
+                if constexpr (can_be_pushed) {
+                    jump_gen->push(ecx);
+                }
+            }
+            jump_gen->push(reinterpret_cast<std::uintptr_t>(this));
         }
-        else {
-            if constexpr (function::convention == detail::traits::cconv::cthiscall) {
+#else
+        jump_gen->pop(eax);
+        // if Ret is class or union, memory for return value as first argument(hidden)
+        // so we need to push our hook pointer after this hidden argument
+        if constexpr (!std::is_void_v<Ret>) {
+            if constexpr (std::is_class_v<Ret> || std::is_union_v<Ret> || sizeof(Ret) > 8) {
+                if constexpr (is_thiscall) {
+                    jump_gen->push(reinterpret_cast<std::uintptr_t>(this));
+                    jump_gen->push(ecx);
+                } else {
+                    jump_gen->pop(eax);
+                    jump_gen->push(reinterpret_cast<std::uintptr_t>(this));
+                    jump_gen->push(eax);
+                    jump_gen->mov(eax, ptr[reinterpret_cast<std::uintptr_t>(&last_return_address)]);
+                }
+
+            } else {
+                if constexpr (is_thiscall) {
+                    if constexpr (can_be_pushed) {
+                        jump_gen->push(ecx);
+                    }
+                }
+                jump_gen->push(reinterpret_cast<std::uintptr_t>(this));
+            }
+        } else {
+            if constexpr (is_thiscall) {
                 if constexpr (can_be_pushed) {
                     jump_gen->push(ecx);
                 }
@@ -573,12 +601,10 @@ private:
             // call relay for restoring stack pointer after call
             jump_gen->call(relay_ptr);
             jump_gen->add(esp, 4);
-#ifndef _WIN32
             jump_gen->mov(ptr[reinterpret_cast<std::uintptr_t>(&context.ecx)], ecx);
             jump_gen->mov(ecx, ptr[&last_return_address]);
             jump_gen->push(ecx);
             jump_gen->mov(ecx, ptr[reinterpret_cast<std::uintptr_t>(&context.ecx)]);
-#endif
             jump_gen->ret();
         } else {
             jump_gen->push(eax);
@@ -629,7 +655,7 @@ private:
     }
 
     hook_info info;
-    mutable std::uintptr_t last_return_address{ 0 };
+    mutable std::uintptr_t last_return_address{0};
     std::size_t hook_size = 0;
     std::unique_ptr<Xbyak::CodeGenerator> jump_gen{
         std::make_unique<Xbyak::CodeGenerator>(Xbyak::DEFAULT_MAX_CODE_SIZE, nullptr, &detail::default_jmp_allocator)};

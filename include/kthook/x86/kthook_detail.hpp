@@ -104,7 +104,7 @@ struct function_traits<Ret(CFASTCALL*)(Args...)> {
 };
 
 template <cconv Conv>
-struct get_registers_count{ 
+struct get_registers_count {
     static constexpr auto value = 0;
 };
 template <>
@@ -141,15 +141,11 @@ struct signal_relay_generator;
 
 template <typename HookPtrType, typename Ret, typename... Args>
 struct signal_relay_generator<HookPtrType, traits::cconv::ccdecl, Ret, std::tuple<Args...>> {
-#ifndef _WIN32
     static Ret CCDECL relay(HookPtrType* this_hook, Args... args) {
-#else
-    static Ret CCDECL relay(std::uintptr_t retaddr, HookPtrType * this_hook, Args... args) {
-#endif
         using source_t = Ret(CCDECL*)(Args...);
         return signal_relay<HookPtrType, Ret, Args...>(this_hook, args...);
     }
-};
+};  // namespace detail
 
 template <typename HookPtrType, typename Ret, typename... Args>
 struct signal_relay_generator<HookPtrType, traits::cconv::cstdcall, Ret, std::tuple<Args...>> {
@@ -184,15 +180,11 @@ struct relay_generator;
 
 template <typename HookPtrType, typename Ret, typename... Args>
 struct relay_generator<HookPtrType, traits::cconv::ccdecl, Ret, std::tuple<Args...>> {
-#ifndef _WIN32
     static Ret CCDECL relay(HookPtrType* this_hook, Args... args) {
-#else
-    static Ret CCDECL relay(std::uintptr_t retaddr, HookPtrType *this_hook, Args... args) {
-#endif
         auto& cb = this_hook->get_callback();
         return common_relay<decltype(cb), HookPtrType, Ret, Args...>(cb, this_hook, args...);
     }
-};
+};  // namespace kthook
 
 template <typename HookPtrType, typename Ret, typename... Args>
 struct relay_generator<HookPtrType, traits::cconv::cstdcall, Ret, std::tuple<Args...>> {
