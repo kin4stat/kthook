@@ -257,7 +257,7 @@ public:
     const CPU_Context& get_context() const { return context; }
 
     const function_ptr get_trampoline() const {
-        return reinterpret_cast<const function_ptr>(trampoline_gen->getCode());
+        return reinterpret_cast<function_ptr>(const_cast<std::uint8_t*>(trampoline_gen->getCode()));
     }
 
     cb_type& get_callback() { return callback; }
@@ -497,7 +497,7 @@ public:
 
     const CPU_Context& get_context() const { return context; }
 
-    const function_ptr get_trampoline() { return reinterpret_cast<const function_ptr>(trampoline_gen->getCode()); }
+    const function_ptr get_trampoline() { return reinterpret_cast<function_ptr>(const_cast<std::uint8_t*>(trampoline_gen->getCode())); }
 
     before_t before;
     after_t after;
