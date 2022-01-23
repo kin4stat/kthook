@@ -55,7 +55,7 @@ struct function_traits;
 
 template <typename Ret, typename Class, typename... Args>
 struct function_traits<Ret (Class::*)(Args...)> {
-    static constexpr auto args_count = sizeof...(Args);
+    static constexpr auto args_count = sizeof...(Args) + 1;
 #ifdef _WIN32
     static constexpr auto convention = cconv::cthiscall;
 #else
