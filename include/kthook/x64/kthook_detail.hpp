@@ -96,7 +96,7 @@ struct function_traits;
 
 template <typename Ret, typename Class, typename... Args>
 struct function_traits<Ret (Class::*)(Args...)> {
-    static constexpr auto args_count = sizeof...(Args);
+    static constexpr auto args_count = sizeof...(Args) + 1;
     using args = std::tuple<Class*, Args...>;
     using return_type = Ret;
 };
