@@ -204,7 +204,7 @@ inline bool check_is_executable(const void* addr) {
     MEMORY_BASIC_INFORMATION buffer;
     VirtualQuery(addr, &buffer, sizeof(buffer));
     return buffer.Protect == PAGE_EXECUTE || buffer.Protect == PAGE_EXECUTE_READ ||
-           buffer.Protect == PAGE_EXECUTE_READWRITE;
+           buffer.Protect == PAGE_EXECUTE_READWRITE || buffer.Protect == PAGE_EXECUTE_WRITECOPY;
 #else
     return true;
     // POSIX HACK PON PON
