@@ -39,6 +39,7 @@ jobs:
                   --step=prepare
                   --compiler=${{matrix.cc}}
                   --architecture=${{matrix.arch}}
+                  --build-dir=build
 
     - name: "Configure"
       run: python build-actions/action.py
@@ -49,9 +50,10 @@ jobs:
                   --architecture=${{matrix.arch}}
                   --build-type=${{matrix.build_type}}
                   --build-defs=${{matrix.defs}}
+                  --build-dir=build
 
     - name: "Build"
-      run: python build-actions/action.py --step=build
+      run: python build-actions/action.py --step=build --build-dir=build
 
     - name: "Test"
-      run: python build-actions/action.py --step=test
+      run: python build-actions/action.py --step=test --build-dir=build/tests

@@ -35,29 +35,29 @@ TEST(KthookSimpleTest, CREATE_NAME(HandlesSimpleUsage)) {
     EXPECT_EQ(A::test_func(test_val), return_default);
 }
 
-TEST(KthookSiginalTest, CREATE_NAME(HandlesSimpleUsage)) {
-    kthook::kthook_signal<decltype(&A::test_func)> hook{&A::test_func};
-
-    {
-        auto connection = hook.before.scoped_connect([](const auto& hook, int& value) {
-            value = return_default;
-            return std::nullopt;
-        });
-
-        EXPECT_EQ(A::test_func(test_val), return_default);
-    }
-
-    {
-        auto connection =
-            hook.before.scoped_connect([](const auto& hook, int& value) { return std::make_optional(return_default); });
-
-        EXPECT_EQ(A::test_func(test_val), return_default);
-    }
-
-    {
-        auto connection = hook.after.scoped_connect(
-            [](const auto& hook, int& return_value, int& value) { return_value = return_default; });
-
-        EXPECT_EQ(A::test_func(test_val), return_default);
-    }
-}
+//TEST(KthookSiginalTest, CREATE_NAME(HandlesSimpleUsage)) {
+//    kthook::kthook_signal<decltype(&A::test_func)> hook{&A::test_func};
+//
+//    {
+//        auto connection = hook.before.scoped_connect([](const auto& hook, int& value) {
+//            value = return_default;
+//            return std::nullopt;
+//        });
+//
+//        EXPECT_EQ(A::test_func(test_val), return_default);
+//    }
+//
+//    {
+//        auto connection =
+//            hook.before.scoped_connect([](const auto& hook, int& value) { return std::make_optional(return_default); });
+//
+//        EXPECT_EQ(A::test_func(test_val), return_default);
+//    }
+//
+//    {
+//        auto connection = hook.after.scoped_connect(
+//            [](const auto& hook, int& return_value, int& value) { return_value = return_default; });
+//
+//        EXPECT_EQ(A::test_func(test_val), return_default);
+//    }
+//}
