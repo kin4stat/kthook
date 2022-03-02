@@ -1,19 +1,19 @@
 {
   "tests": [
     {
-      "cmd": ["aggregates_test"],
+      "cmd": ["tests/aggregates_test"],
       "optional": true
     },
     {
-      "cmd": ["lots_of_arguments_test"],
+      "cmd": [ "tests/lots_of_arguments_test" ],
       "optional": true
     },
     {
-      "cmd": ["non_executable_test"],
+      "cmd": [ "tests/non_executable_test" ],
       "optional": true
     },
     {
-      "cmd": ["simple_test"],
+      "cmd": [ "tests/simple_test" ],
       "optional": true
     }
   ]
