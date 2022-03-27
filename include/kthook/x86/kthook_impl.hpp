@@ -647,7 +647,12 @@ private:
                 jump_gen->rewrite(0, original, 8);
             }
         } else if (relay_jump) {
-            std::memcpy(reinterpret_cast<void*>(&original), relay_jump, sizeof(original));
+            if (!set_memory_prot(reinterpret_cast<void*>(info.hook_address), this->hook_size,
+                                 detail::MemoryProt::PROTECT_RWE))
+                return false;
+
+            std::memcpy(reinterpret_cast<void*>(info.hook_address), info.original_code.get(), this->hook_size);
+            
             jump_gen->rewrite(0, 0x9090909090909090, 8);
         }
         detail::flush_intruction_cache(relay_jump, jump_gen->getSize());
