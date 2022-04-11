@@ -3,8 +3,6 @@ project(kthook)
 
 option(KTHOOK_TEST "Compile tests" OFF)
 
-add_subdirectory(ktsignal)
-add_subdirectory(xbyak)
 add_subdirectory(hde)
 
 add_library(${PROJECT_NAME} INTERFACE)

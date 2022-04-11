@@ -1,6 +1,3 @@
-[submodule "ktsignal"]
-	path = ktsignal
-	url = https://github.com/KiN4StAt/ktsignal.git
 [submodule "xbyak"]
 	path = xbyak
 	url = https://github.com/herumi/xbyak.git
