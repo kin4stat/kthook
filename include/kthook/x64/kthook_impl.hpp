@@ -282,6 +282,7 @@ public:
     ~kthook_simple() { remove(); }
 
     bool install() {
+        if (installed) return false;
         if (info.hook_address == 0) return false;
         if (!detail::check_is_executable(reinterpret_cast<void*>(info.hook_address))) return false;
         if (!create_generators()) return false;
@@ -289,10 +290,15 @@ public:
         if (!detail::flush_intruction_cache(trampoline_gen->getCode(), trampoline_gen->getSize())) return false;
         if (!patch_hook(true)) return false;
         if (!detail::flush_intruction_cache(reinterpret_cast<void*>(info.hook_address), hook_size)) return false;
+        installed = true;
         return true;
     }
 
-    bool remove() { return patch_hook(false); }
+    bool remove() {
+        if (!installed) return false;
+        installed = !patch_hook(false);
+        return !installed;
+    }
 
     bool reset() {
         if (!set_memory_prot(reinterpret_cast<void*>(info.hook_address), this->hook_size,
@@ -302,6 +308,7 @@ public:
         if (!set_memory_prot(reinterpret_cast<void*>(info.hook_address), this->hook_size,
                              detail::MemoryProt::PROTECT_RE))
             return false;
+        installed = false;
         return true;
     }
 
@@ -515,6 +522,7 @@ private:
     const std::uint8_t* relay_jump = nullptr;
     std::conditional_t<create_context, cpu_ctx, detail::cpu_ctx_empty> context;
     bool using_ptr_to_return_address = true;
+    bool installed = false;
 };
 
 template <typename FunctionPtrT, kthook_option Options = kthook_option::kNone>
@@ -566,6 +574,7 @@ public:
     ~kthook_signal() { remove(); }
 
     bool install() {
+        if (installed) return false;
         if (info.hook_address == 0) return false;
         if (!detail::check_is_executable(reinterpret_cast<void*>(info.hook_address))) return false;
         if (!create_generators()) return false;
@@ -573,10 +582,15 @@ public:
         if (!detail::flush_intruction_cache(trampoline_gen->getCode(), trampoline_gen->getSize())) return false;
         if (!patch_hook(true)) return false;
         if (!detail::flush_intruction_cache(reinterpret_cast<void*>(info.hook_address), hook_size)) return false;
+        installed = true;
         return true;
     }
 
-    bool remove() { return patch_hook(false); }
+    bool remove() {
+        if (!installed) return false;
+        installed = !patch_hook(false);
+        return !installed;
+    }
 
     bool reset() {
         if (!set_memory_prot(reinterpret_cast<void*>(info.hook_address), this->hook_size,
@@ -586,6 +600,8 @@ public:
         if (!set_memory_prot(reinterpret_cast<void*>(info.hook_address), this->hook_size,
                              detail::MemoryProt::PROTECT_RE))
             return false;
+        installed = false;
+        return true;
     }
 
     void set_dest(std::uintptr_t address) { info = {address, nullptr}; }
@@ -795,6 +811,7 @@ private:
     const std::uint8_t* relay_jump = nullptr;
     std::conditional_t<create_context, cpu_ctx, detail::cpu_ctx_empty> context;
     bool using_ptr_to_return_address = true;
+    bool installed = false;
 };
 
 class kthook_naked {
@@ -833,6 +850,7 @@ public:
     ~kthook_naked() { remove(); }
 
     bool install() {
+        if (installed) return false;
         if (info.hook_address == 0) return false;
         if (!detail::check_is_executable(reinterpret_cast<void*>(info.hook_address))) return false;
         if (!create_generators()) return false;
@@ -840,10 +858,15 @@ public:
         if (!detail::flush_intruction_cache(trampoline_gen->getCode(), trampoline_gen->getSize())) return false;
         if (!patch_hook(true)) return false;
         if (!detail::flush_intruction_cache(reinterpret_cast<void*>(info.hook_address), hook_size)) return false;
+        installed = true;
         return true;
     }
 
-    bool remove() { return patch_hook(false); }
+    bool remove() {
+        if (!installed) return false;
+        installed = !patch_hook(false);
+        return !installed;
+    }
 
     bool reset() {
         if (!set_memory_prot(reinterpret_cast<void*>(info.hook_address), this->hook_size,
@@ -1013,6 +1036,7 @@ private:
     std::unique_ptr<Xbyak::CodeGenerator> trampoline_gen;
 
     const std::uint8_t* relay_jump{nullptr};
+    bool installed;
 };
 } // namespace kthook
 

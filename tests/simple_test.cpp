@@ -43,7 +43,11 @@ TEST(KthookNakedTest, CREATE_NAME(HandlesSimpleUsage)) {
     hook.set_cb([](const kthook::kthook_naked& hook) {
         auto& ctx = hook.get_context();
 
+#ifdef KTHOOK_WIN64
         EXPECT_EQ(ctx.rcx, test_val);
+#else
+        EXPECT_EQ(ctx.rdi, test_val);
+#endif
     });
 
     A::test_func(test_val);
