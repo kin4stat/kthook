@@ -143,6 +143,8 @@ __attribute__((cdecl)) inline void
 #else
 inline void __cdecl
 #endif
+#else
+inline void
 #endif
 naked_relay(HookType* this_hook) {
     auto& cb = this_hook->get_callback();

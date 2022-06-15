@@ -811,6 +811,8 @@ private:
         jump_gen->mov(ptr[reinterpret_cast<std::uintptr_t>(&context.esp)], esp);
         jump_gen->mov(eax, ret_addr);
 
+        jump_gen->mov(ptr[reinterpret_cast<std::uintptr_t>(&last_return_address)], info.hook_address + hook_size);
+
         jump_gen->push(reinterpret_cast<std::uintptr_t>(this));
         jump_gen->push(eax);
 
