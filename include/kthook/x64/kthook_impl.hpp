@@ -853,6 +853,7 @@ public:
         if (!set_memory_prot(reinterpret_cast<void*>(info.hook_address), this->hook_size,
                              detail::MemoryProt::PROTECT_RE))
             return false;
+        return true;
     }
 
     [[nodiscard]] cb_type& get_callback() { return callback; }

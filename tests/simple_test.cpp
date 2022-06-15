@@ -37,7 +37,7 @@ TEST(KthookSimpleTest, CREATE_NAME(HandlesSimpleUsage)) {
 
 #ifdef KTHOOK_64
 TEST(KthookNakedTest, CREATE_NAME(HandlesSimpleUsage)) {
-    kthook::kthook_naked hook{&A::test_func};
+    kthook::kthook_naked hook{ reinterpret_cast<std::uintptr_t>(&A::test_func) };
     hook.install();
 
     hook.set_cb([](const kthook::kthook_naked& hook) {
@@ -74,7 +74,7 @@ public:
 };
 
 TEST(KthookNakedTest, CREATE_NAME(HandlesSimpleUsageThiscall)) {
-    kthook::kthook_naked hook{&A::test_func};
+    kthook::kthook_naked hook{reinterpret_cast<std::uintptr_t>(&A::test_func)};
     hook.install();
 
     hook.set_cb([](const kthook::kthook_naked& hook) {
@@ -86,7 +86,7 @@ TEST(KthookNakedTest, CREATE_NAME(HandlesSimpleUsageThiscall)) {
     AT::test_func(test_val);
 }
 TEST(KthookNakedTest, CREATE_NAME(HandlesSimpleUsageFastcall)) {
-    kthook::kthook_naked hook{&A::test_func};
+    kthook::kthook_naked hook{reinterpret_cast<std::uintptr_t>(&A::test_func)};
     hook.install();
 
     hook.set_cb([](const kthook::kthook_naked& hook) {
