@@ -41,7 +41,8 @@ template <class... Types>
 using convert_refs_t = typename convert_refs<Types...>::type;
 
 template <typename Tuple>
-struct add_refs {};
+struct add_refs {
+};
 
 template <typename... Ts>
 struct add_refs<std::tuple<Ts...>> {
@@ -67,12 +68,12 @@ struct on_after_type;
 
 template <class HookT, class T, typename... Ts>
 struct on_after_type<HookT, T, std::tuple<Ts...>, typename std::enable_if<std::is_void_v<T>>::type> {
-    using type = ktsignal::ktsignal_threadsafe<void(const HookT&, std::add_lvalue_reference_t<Ts>...)>;
+    using type = ktsignal::ktsignal_threadsafe<void(const HookT&, std::add_lvalue_reference_t<Ts> ...)>;
 };
 
 template <class HookT, class T, typename... Ts>
 struct on_after_type<HookT, T, std::tuple<Ts...>, typename std::enable_if<!std::is_void_v<T>>::type> {
-    using type = ktsignal::ktsignal_threadsafe<void(const HookT&, T&, std::add_lvalue_reference_t<Ts>...)>;
+    using type = ktsignal::ktsignal_threadsafe<void(const HookT&, T&, std::add_lvalue_reference_t<Ts> ...)>;
 };
 
 template <class HookT, class T, typename Tuple, typename Enable = void>
@@ -80,19 +81,19 @@ struct on_before_type;
 
 template <class HookT, class T, typename... Ts>
 struct on_before_type<HookT, T, std::tuple<Ts...>, typename std::enable_if<std::is_void_v<T>>::type> {
-    using type = ktsignal::ktsignal_threadsafe<bool(const HookT&, std::add_lvalue_reference_t<Ts>...)>;
+    using type = ktsignal::ktsignal_threadsafe<bool(const HookT&, std::add_lvalue_reference_t<Ts> ...)>;
 };
 
 template <class HookT, class T, typename... Ts>
 struct on_before_type<HookT, T, std::tuple<Ts...>, typename std::enable_if<!std::is_void_v<T>>::type> {
-    using type = ktsignal::ktsignal_threadsafe<std::optional<T>(const HookT&, std::add_lvalue_reference_t<Ts>...)>;
+    using type = ktsignal::ktsignal_threadsafe<std::optional<T>(const HookT&, std::add_lvalue_reference_t<Ts> ...)>;
 };
 
 template <typename HookType, typename Ret, typename Args>
 using on_before_t = typename on_before_type<HookType, Ret, Args>::type;
 template <typename HookType, typename Ret, typename Args>
 using on_after_t = typename on_after_type<HookType, Ret, Args>::type;
-}  // namespace traits
+} // namespace traits
 
 template <typename HookPtrType, typename Ret, typename... Args>
 inline Ret signal_relay(HookPtrType* this_hook, Args&... args) {
@@ -134,41 +135,58 @@ inline Ret common_relay(CallbackT& cb, HookPtrType* this_hook, Args&... args) {
         return this_hook->get_trampoline()(args...);
 }
 
+
+template <typename HookType>
+#ifdef KTHOOK_32
+#ifdef __GNUC__
+__attribute__((cdecl)) inline void
+#else
+inline void __cdecl
+#endif
+#endif
+naked_relay(HookType* this_hook) {
+    auto& cb = this_hook->get_callback();
+    if (cb) {
+        cb(*this_hook);
+    }
+}
+
 // https://github.com/TsudaKageyu/minhook/blob/master/src/trampoline.h
 #pragma pack(push, 1)
 struct JCC_ABS {
-    std::uint8_t opcode;  // 7* 0E:         J** +16
+    std::uint8_t opcode; // 7* 0E:         J** +16
     std::uint8_t dummy0;
-    std::uint8_t dummy1;  // FF25 00000000: JMP [+6]
+    std::uint8_t dummy1; // FF25 00000000: JMP [+6]
     std::uint8_t dummy2;
     std::uint32_t dummy3;
-    std::uint64_t address;  // Absolute destination address
+    std::uint64_t address; // Absolute destination address
 };
 
 struct CALL_ABS {
-    std::uint8_t opcode0;  // FF15 00000002: CALL [+6]
+    std::uint8_t opcode0; // FF15 00000002: CALL [+6]
     std::uint8_t opcode1;
     std::uint32_t dummy0;
-    std::uint8_t dummy1;  // EB 08:         JMP +10
+    std::uint8_t dummy1; // EB 08:         JMP +10
     std::uint8_t dummy2;
-    std::uint64_t address;  // Absolute destination address
+    std::uint64_t address; // Absolute destination address
 };
 
 struct JMP_ABS {
-    std::uint8_t opcode0;  // FF25 00000000: JMP [+6]
+    std::uint8_t opcode0; // FF25 00000000: JMP [+6]
     std::uint8_t opcode1;
     std::uint32_t dummy;
-    std::uint64_t address;  // Absolute destination address
+    std::uint64_t address; // Absolute destination address
 };
+
 typedef struct {
-    std::uint8_t opcode;    // E9/E8 xxxxxxxx: JMP/CALL +5+xxxxxxxx
-    std::uint32_t operand;  // Relative destination address
+    std::uint8_t opcode;   // E9/E8 xxxxxxxx: JMP/CALL +5+xxxxxxxx
+    std::uint32_t operand; // Relative destination address
 } JMP_REL, CALL_REL;
 
 struct JCC_REL {
-    std::uint8_t opcode0;  // 0F8* xxxxxxxx: J** +6+xxxxxxxx
+    std::uint8_t opcode0; // 0F8* xxxxxxxx: J** +6+xxxxxxxx
     std::uint8_t opcode1;
-    std::uint32_t operand;  // Relative destination address
+    std::uint32_t operand; // Relative destination address
 };
 #pragma pack(pop)
 
@@ -186,6 +204,7 @@ inline std::size_t detect_hook_size(std::uintptr_t addr) {
 inline std::uintptr_t get_relative_address(std::uintptr_t dest, std::uintptr_t src, std::size_t oplen = 5) {
     return dest - src - oplen;
 }
+
 inline std::uintptr_t restore_absolute_address(std::uintptr_t RIP, std::uintptr_t rel, std::size_t oplen = 5) {
     return RIP + static_cast<std::int32_t>(rel) + oplen;
 }
@@ -223,6 +242,7 @@ enum class MemoryProt {
     PROTECT_RWE,
     PROTECT_RE,
 };
+
 inline bool set_memory_prot(const void* addr, std::size_t size, MemoryProt protectMode) {
 #if defined(_WIN32)
     const DWORD c_rw = PAGE_READWRITE;
@@ -260,25 +280,31 @@ inline bool set_memory_prot(const void* addr, std::size_t size, MemoryProt prote
     return true;
 #endif
 }
+
 inline struct JumpAllocator : Xbyak::Allocator {
-    virtual uint8_t* alloc(size_t size) {
+    uint8_t* alloc(size_t size) override {
         void* ptr = Xbyak::AlignedMalloc(size, Xbyak::inner::ALIGN_PAGE_SIZE);
         set_memory_prot(ptr, size, MemoryProt::PROTECT_RWE);
         return reinterpret_cast<uint8_t*>(ptr);
     }
-    virtual void free(uint8_t* p) {}
-    virtual bool useProtect() const { return false; }
+
+    void free(uint8_t* p) override {
+    }
+
+    bool useProtect() const override { return false; }
 } default_jmp_allocator;
+
 inline struct TrampolineAllocator : Xbyak::Allocator {
-    virtual uint8_t* alloc(size_t size) {
+    uint8_t* alloc(size_t size) override {
         void* ptr = Xbyak::AlignedMalloc(size, Xbyak::inner::ALIGN_PAGE_SIZE);
         set_memory_prot(ptr, size, MemoryProt::PROTECT_RWE);
         return reinterpret_cast<uint8_t*>(ptr);
     }
-    virtual void free(uint8_t* p) { Xbyak::AlignedFree(p); }
-    virtual bool useProtect() const { return false; }
+
+    void free(uint8_t* p) override { Xbyak::AlignedFree(p); }
+    bool useProtect() const override { return false; }
 } default_trampoline_allocator;
-}  // namespace detail
-}  // namespace kthook
+} // namespace detail
+} // namespace kthook
 
 #endif  // KTHOOK_DETAIL_X86_64_HPP_

@@ -35,29 +35,93 @@ TEST(KthookSimpleTest, CREATE_NAME(HandlesSimpleUsage)) {
     EXPECT_EQ(A::test_func(test_val), return_default);
 }
 
-//TEST(KthookSiginalTest, CREATE_NAME(HandlesSimpleUsage)) {
-//    kthook::kthook_signal<decltype(&A::test_func)> hook{&A::test_func};
-//
-//    {
-//        auto connection = hook.before.scoped_connect([](const auto& hook, int& value) {
-//            value = return_default;
-//            return std::nullopt;
-//        });
-//
-//        EXPECT_EQ(A::test_func(test_val), return_default);
-//    }
-//
-//    {
-//        auto connection =
-//            hook.before.scoped_connect([](const auto& hook, int& value) { return std::make_optional(return_default); });
-//
-//        EXPECT_EQ(A::test_func(test_val), return_default);
-//    }
-//
-//    {
-//        auto connection = hook.after.scoped_connect(
-//            [](const auto& hook, int& return_value, int& value) { return_value = return_default; });
-//
-//        EXPECT_EQ(A::test_func(test_val), return_default);
-//    }
-//}
+#ifdef KTHOOK_64
+TEST(KthookNakedTest, CREATE_NAME(HandlesSimpleUsage)) {
+    kthook::kthook_naked hook{&A::test_func};
+    hook.install();
+
+    hook.set_cb([](const kthook::kthook_naked& hook) {
+        auto& ctx = hook.get_context();
+
+        EXPECT_EQ(ctx.rcx, test_val);
+    });
+
+    A::test_func(test_val);
+}
+#else
+class AT {
+public:
+    NO_OPTIMIZE static int
+#ifdef KTHOOK_32
+        CTHISCALL
+#endif
+        test_func(int value) {
+        SIZE_ENLARGER();
+        return value;
+    }
+};
+
+class AF {
+public:
+    NO_OPTIMIZE static int
+#ifdef KTHOOK_32
+        CFASTCALL
+#endif
+        test_func(int value) {
+        SIZE_ENLARGER();
+        return value;
+    }
+};
+
+TEST(KthookNakedTest, CREATE_NAME(HandlesSimpleUsageThiscall)) {
+    kthook::kthook_naked hook{&A::test_func};
+    hook.install();
+
+    hook.set_cb([](const kthook::kthook_naked& hook) {
+        auto& ctx = hook.get_context();
+
+        EXPECT_EQ(ctx.ecx, test_val);
+    });
+
+    AT::test_func(test_val);
+}
+TEST(KthookNakedTest, CREATE_NAME(HandlesSimpleUsageFastcall)) {
+    kthook::kthook_naked hook{&A::test_func};
+    hook.install();
+
+    hook.set_cb([](const kthook::kthook_naked& hook) {
+        auto& ctx = hook.get_context();
+
+        EXPECT_EQ(ctx.ecx, test_val);
+    });
+
+    AF::test_func(test_val);
+}
+#endif
+
+TEST(KthookSiginalTest, CREATE_NAME(HandlesSimpleUsage)) {
+    kthook::kthook_signal<decltype(&A::test_func)> hook{&A::test_func};
+
+    {
+        auto connection = hook.before.scoped_connect([](const auto& hook, int& value) {
+            value = return_default;
+            return std::nullopt;
+        });
+
+        EXPECT_EQ(A::test_func(test_val), return_default);
+    }
+
+    {
+        auto connection =
+            hook.before.scoped_connect([&](const auto& hook, int& value) { return std::make_optional(return_default); });
+
+        EXPECT_EQ(A::test_func(test_val), return_default);
+    }
+
+    {
+        auto connection = hook.after.scoped_connect(
+            [&](const auto& hook, int& return_value, int& value) { return_value = return_default; });
+
+        EXPECT_EQ(A::test_func(test_val), return_default);
+    }
+}
