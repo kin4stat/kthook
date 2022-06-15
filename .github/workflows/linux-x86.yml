@@ -9,10 +9,10 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { title: "linux"         , os: "ubuntu-latest" , cc: "gcc-12"     , arch: "x86", build_type: "Debug"  , defs: "AARCH=x86,KTHOOK_TEST=ON" }
-          - { title: "linux"         , os: "ubuntu-latest" , cc: "gcc-12"     , arch: "x86", build_type: "Release", defs: "AARCH=x86,KTHOOK_TEST=ON" }
-          - { title: "linux"         , os: "ubuntu-latest" , cc: "clang-14"   , arch: "x86", build_type: "Debug"  , defs: "AARCH=x86,KTHOOK_TEST=ON" }
-          - { title: "linux"         , os: "ubuntu-latest" , cc: "clang-14"   , arch: "x86", build_type: "Release", defs: "AARCH=x86,KTHOOK_TEST=ON" }
+          - { title: "linux"         , os: "ubuntu-latest" , cc: "gcc-11"     , arch: "x86", build_type: "Debug"  , defs: "AARCH=x86,KTHOOK_TEST=ON" }
+          - { title: "linux"         , os: "ubuntu-latest" , cc: "gcc-11"     , arch: "x86", build_type: "Release", defs: "AARCH=x86,KTHOOK_TEST=ON" }
+          - { title: "linux"         , os: "ubuntu-latest" , cc: "clang-12"   , arch: "x86", build_type: "Debug"  , defs: "AARCH=x86,KTHOOK_TEST=ON" }
+          - { title: "linux"         , os: "ubuntu-latest" , cc: "clang-12"   , arch: "x86", build_type: "Release", defs: "AARCH=x86,KTHOOK_TEST=ON" }
     # The CMake configure and build commands are platform agnostic and should work equally well on Windows or Mac.
     # You can convert this to a matrix build if you need cross-platform coverage.
     # See: https://docs.github.com/en/free-pro-team@latest/actions/learn-github-actions/managing-complex-workflows#using-a-build-matrix
