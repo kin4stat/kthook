@@ -1,15 +1,17 @@
 #ifndef KTHOOK_DETAIL_HPP_
 #define KTHOOK_DETAIL_HPP_
+
 namespace kthook {
 namespace detail {
 namespace traits {
 template <typename Ret, typename T, typename Enable = void>
-struct count_integrals {};
+struct count_integrals {
+};
 
 struct relay_args_info {
     std::size_t head_size;
     std::size_t tail_size;
-    int register_idx_if_full = -1;  // if -1 then register don't used
+    int register_idx_if_full = -1; // if -1 then register don't used
 };
 
 #ifdef _WIN32
@@ -48,7 +50,8 @@ constexpr relay_args_info internal_get_head_and_tail_size(std::size_t integral_r
 #endif
 
 template <std::size_t RegistersCount, typename Ret, typename Tuple>
-struct get_head_and_tail_size {};
+struct get_head_and_tail_size {
+};
 
 template <std::size_t RegistersCount, typename Ret, typename... Ts>
 struct get_head_and_tail_size<RegistersCount, Ret, std::tuple<Ts...>> {
@@ -56,7 +59,8 @@ struct get_head_and_tail_size<RegistersCount, Ret, std::tuple<Ts...>> {
 };
 
 template <typename Tuple, typename Sequence>
-struct get_first_n_types {};
+struct get_first_n_types {
+};
 
 template <typename Tuple, std::size_t... Is>
 struct get_first_n_types<Tuple, std::index_sequence<Is...>> {
@@ -67,7 +71,8 @@ template <std::size_t N, typename Tuple>
 using get_first_n_types_t = typename get_first_n_types<Tuple, std::make_index_sequence<N>>::type;
 
 template <std::size_t N, typename Tuple, typename Sequence>
-struct get_last_n_types {};
+struct get_last_n_types {
+};
 
 template <std::size_t N, typename Tuple, std::size_t... Is>
 struct get_last_n_types<N, Tuple, std::index_sequence<Is...>> {
@@ -79,36 +84,39 @@ using get_last_n_types_t = typename get_last_n_types<TupleSize - N, Tuple, std::
 
 template <typename Ret, typename Tuple>
 struct function_connect_ptr;
+
 template <typename Ret, typename... Args>
 struct function_connect_ptr<Ret, std::tuple<Args...>> {
-    using type = Ret (*)(Args...);
+    using type = Ret (*)(Args ...);
 };
 
 template <class R, class Tuple>
 struct function_connect;
+
 template <class R, class... Types>
 struct function_connect<R, std::tuple<Types...>> {
-    using type = R(Types...);
+    using type = R(Types ...);
 };
 
 template <typename Pointer>
 struct function_traits;
 
 template <typename Ret, typename Class, typename... Args>
-struct function_traits<Ret (Class::*)(Args...)> {
+struct function_traits<Ret (Class::*)(Args ...)> {
     static constexpr auto args_count = sizeof...(Args) + 1;
     using args = std::tuple<Class*, Args...>;
     using return_type = Ret;
 };
 
 template <typename Ret, typename... Args>
-struct function_traits<Ret (*)(Args...)> {
+struct function_traits<Ret (*)(Args ...)> {
     static constexpr auto args_count = sizeof...(Args);
     using args = std::tuple<Args...>;
     using return_type = Ret;
 };
+
 template <typename Ret, typename... Args>
-struct function_traits<Ret(Args...)> {
+struct function_traits<Ret(Args ...)> {
     static constexpr auto args_count = sizeof...(Args);
     using args = std::tuple<Args...>;
     using return_type = Ret;
@@ -120,7 +128,7 @@ using function_connect_ptr_t = typename function_connect_ptr<Ret, Args...>::type
 template <class R, class... Types>
 using function_connect_t = typename function_connect<R, Types...>::type;
 
-}  // namespace traits
+} // namespace traits
 
 #ifndef _WIN32
 template <typename HookType>
@@ -134,7 +142,8 @@ private:
 #endif
 
 template <typename HookType, typename Ret, typename Head, typename Tail, typename Args>
-struct common_relay_generator {};
+struct common_relay_generator {
+};
 
 template <typename HookType, typename Ret, typename... Head, typename... Tail, typename... Args>
 struct common_relay_generator<HookType, Ret, std::tuple<Head...>, std::tuple<Tail...>, std::tuple<Args...>> {
@@ -142,15 +151,16 @@ struct common_relay_generator<HookType, Ret, std::tuple<Head...>, std::tuple<Tai
     static Ret relay(Head... head_args, SystemVAbiTrick<HookType> rsp_ptr, Tail... tail_args) {
         auto this_hook = rsp_ptr.ptr;
 #else
-    static Ret relay(Head... head_args, HookType* this_hook, Tail... tail_args) {
+    static Ret relay(Head ... head_args, HookType* this_hook, void*, Tail ... tail_args) {
 #endif
         auto& cb = this_hook->get_callback();
         return common_relay<decltype(cb), HookType, Ret, Args...>(cb, this_hook, head_args..., tail_args...);
     }
-};  // namespace detail
+}; // namespace detail
 
 template <typename HookType, typename Ret, typename Head, typename Tail, typename Args>
-struct signal_relay_generator {};
+struct signal_relay_generator {
+};
 
 template <typename HookType, typename Ret, typename... Head, typename... Tail, typename... Args>
 struct signal_relay_generator<HookType, Ret, std::tuple<Head...>, std::tuple<Tail...>, std::tuple<Args...>> {
@@ -158,7 +168,7 @@ struct signal_relay_generator<HookType, Ret, std::tuple<Head...>, std::tuple<Tai
     static Ret relay(Head... head_args, SystemVAbiTrick<HookType> rsp_ptr, Tail... tail_args) {
         auto this_hook = rsp_ptr.ptr;
 #else
-    static Ret relay(Head... head_args, HookType* this_hook, Tail... tail_args) {
+    static Ret relay(Head ... head_args, HookType* this_hook, void*, Tail ... tail_args) {
 #endif
         return signal_relay<HookType, Ret, Args...>(this_hook, head_args..., tail_args...);
     }
@@ -166,7 +176,7 @@ struct signal_relay_generator<HookType, Ret, std::tuple<Head...>, std::tuple<Tai
 
 inline std::uintptr_t find_prev_free(std::uintptr_t from, std::uintptr_t to, std::uintptr_t granularity) {
 #ifdef KTHOOK_64_WIN
-    to -= to % granularity;  // alignment
+    to -= to % granularity; // alignment
     to -= granularity;
     while (from < to) {
         MEMORY_BASIC_INFORMATION mbi;
@@ -192,7 +202,7 @@ inline std::uintptr_t find_prev_free(std::uintptr_t from, std::uintptr_t to, std
 
 inline std::uintptr_t find_next_free(std::uintptr_t from, std::uintptr_t to, std::uintptr_t granularity) {
 #ifdef KTHOOK_64_WIN
-    from -= from % granularity;  // alignment
+    from -= from % granularity; // alignment
     from += granularity;
     while (from <= to) {
         MEMORY_BASIC_INFORMATION mbi;
@@ -220,8 +230,8 @@ inline std::uintptr_t find_next_free(std::uintptr_t from, std::uintptr_t to, std
 
 inline void* try_alloc_near(std::uintptr_t address) {
 #ifdef KTHOOK_64_WIN
-    constexpr auto kMaxMemoryRange = 0x40000000;  // 1gb
-    constexpr auto kMemoryBlockSize = 0x1000;     // windows page size
+    constexpr auto kMaxMemoryRange = 0x40000000; // 1gb
+    constexpr auto kMemoryBlockSize = 0x1000;    // windows page size
     SYSTEM_INFO si;
     GetSystemInfo(&si);
     std::uintptr_t min_address = reinterpret_cast<std::uintptr_t>(si.lpMinimumApplicationAddress);
@@ -295,7 +305,7 @@ inline void* try_alloc_near(std::uintptr_t address) {
     return result;
 #endif
 }
-}  // namespace detail
-}  // namespace kthook
+} // namespace detail
+} // namespace kthook
 
 #endif  // KTHOOK_DETAIL_HPP_
