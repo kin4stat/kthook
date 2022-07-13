@@ -273,7 +273,7 @@ inline bool check_is_executable(const void* addr) {
     std::uintptr_t iaddr = reinterpret_cast<std::uintptr_t>(addr);
 
     for (auto& mi : map_infos) {
-        if (mi.start <= iaddr && iaddr <= mi.end) {
+        if (mi.start <= iaddr && iaddr < mi.end) {
             if (mi.prot & PROT_EXEC) {
                 return true;
             }
