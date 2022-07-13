@@ -9,8 +9,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { title: "macos"       , os: "macos-latest", cc: "clang-13"  , arch: "x64", build_type: "Debug"  , defs: "KTHOOK_TEST=ON" }
-          - { title: "macos"       , os: "macos-latest", cc: "clang-13"  , arch: "x64", build_type: "Release", defs: "KTHOOK_TEST=ON" }
+          - { title: "macos"       , os: "macos-latest", cc: "clang"  , arch: "x64", build_type: "Debug"  , defs: "KTHOOK_TEST=ON" }
+          - { title: "macos"       , os: "macos-latest", cc: "clang"  , arch: "x64", build_type: "Release", defs: "KTHOOK_TEST=ON" }
     name: "${{matrix.title}} (${{matrix.cc}}, ${{matrix.arch}}, ${{matrix.build_type}})"
     runs-on: "${{matrix.os}}"
 
