@@ -6,7 +6,6 @@
 #else
 #define hde_disasm(code, hs) hde64_disasm(code, hs)
 #endif
-#include <tlhelp32.h>
 
 namespace kthook {
 namespace detail {
