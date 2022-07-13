@@ -227,15 +227,60 @@ inline bool check_is_executable(const void* addr) {
     return buffer.Protect == PAGE_EXECUTE || buffer.Protect == PAGE_EXECUTE_READ ||
            buffer.Protect == PAGE_EXECUTE_READWRITE || buffer.Protect == PAGE_EXECUTE_WRITECOPY;
 #else
-    return true;
-    // POSIX HACK PON PON
-    /* static auto granularity = sysconf(_SC_PAGESIZE);
-     void* allocated = mmap(const_cast<void*>(addr), granularity, PROT_EXEC | PROT_READ | PROT_WRITE,
-     void* allocated = mmap(const_cast<void*>(addr), granularity, PROT_EXEC | PROT_READ | PROT_WRITE,
-                            MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED_NOREPLACE, 0, 0);
-     if (reinterpret_cast<std::uintptr_t>(allocated) == 0xffffffffffffffff) return false;
-     munmap(const_cast<void*>(addr), granularity);
-     return true;*/
+
+    struct map_info {
+        std::uintptr_t start;
+        std::uintptr_t end;
+
+        unsigned prot;
+    };
+
+    auto parse_proc_maps = []() {
+        std::vector<map_info> result;
+
+        std::ifstream proc_maps{ "/proc/self/maps" };
+        std::string line;
+
+        while (std::getline(proc_maps, line)) {
+            map_info parse_result{};
+
+            auto start = 0u;
+            auto i = 0u;
+            while (line[i] != '-') { ++i; }
+
+            std::from_chars(&line[start], &line[i], parse_result.start, 16);
+
+            start = ++i;
+            while (line[i] != '\t' && line[i] != ' ') { ++i; }
+            std::from_chars(&line[start], &line[i], parse_result.end, 16);
+
+            start = ++i;
+            while (line[i] != '\t' && line[i] != ' ') { ++i; }
+
+            if (line[start++] == 'r')
+                parse_result.prot |= PROT_READ;
+            if (line[start++] == 'w')
+                parse_result.prot |= PROT_WRITE;
+            if (line[start++] == 'x')
+                parse_result.prot |= PROT_EXEC;
+            result.push_back(parse_result);
+        }
+        return result;
+    };
+
+    auto map_infos = parse_proc_maps();
+
+    std::uintptr_t iaddr = reinterpret_cast<std::uintptr_t>(addr);
+
+    for (auto& mi : map_infos) {
+        if (mi.start <= iaddr && iaddr <= mi.end) {
+            if (mi.prot & PROT_EXEC) {
+                return true;
+            }
+        }
+    }
+
+    return false;
 #endif
 }
 

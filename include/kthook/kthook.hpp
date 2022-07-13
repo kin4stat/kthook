@@ -26,6 +26,8 @@
 #endif
 #include <windows.h>
 #else
+#include <charconv>
+#include <fstream>
 #include <sys/mman.h>
 #endif
 
