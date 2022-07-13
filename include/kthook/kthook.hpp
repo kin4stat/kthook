@@ -27,6 +27,7 @@
 #include <windows.h>
 #include <tlhelp32.h>
 #else
+#include <filesystem>
 #include <charconv>
 #include <fstream>
 #include <sys/mman.h>

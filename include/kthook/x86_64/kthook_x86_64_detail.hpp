@@ -220,6 +220,48 @@ inline bool flush_intruction_cache(const void* ptr, std::size_t size) {
 #endif
 }
 
+#ifndef _WIN32
+struct map_info {
+    std::uintptr_t start;
+    std::uintptr_t end;
+
+    unsigned prot;
+};
+
+inline std::vector<map_info> parse_proc_maps() {
+    std::vector<map_info> result;
+
+    std::ifstream proc_maps{"/proc/self/maps"};
+    std::string line;
+
+    while (std::getline(proc_maps, line)) {
+        map_info parse_result{};
+
+        auto start = 0u;
+        auto i = 0u;
+        while (line[i] != '-') { ++i; }
+
+        std::from_chars(&line[start], &line[i], parse_result.start, 16);
+
+        start = ++i;
+        while (line[i] != '\t' && line[i] != ' ') { ++i; }
+        std::from_chars(&line[start], &line[i], parse_result.end, 16);
+
+        start = ++i;
+        while (line[i] != '\t' && line[i] != ' ') { ++i; }
+
+        if (line[start++] == 'r')
+            parse_result.prot |= PROT_READ;
+        if (line[start++] == 'w')
+            parse_result.prot |= PROT_WRITE;
+        if (line[start++] == 'x')
+            parse_result.prot |= PROT_EXEC;
+        result.push_back(parse_result);
+    }
+    return result;
+}
+#endif
+
 inline bool check_is_executable(const void* addr) {
 #ifdef _WIN32
     MEMORY_BASIC_INFORMATION buffer;
@@ -227,46 +269,6 @@ inline bool check_is_executable(const void* addr) {
     return buffer.Protect == PAGE_EXECUTE || buffer.Protect == PAGE_EXECUTE_READ ||
            buffer.Protect == PAGE_EXECUTE_READWRITE || buffer.Protect == PAGE_EXECUTE_WRITECOPY;
 #else
-
-    struct map_info {
-        std::uintptr_t start;
-        std::uintptr_t end;
-
-        unsigned prot;
-    };
-
-    auto parse_proc_maps = []() {
-        std::vector<map_info> result;
-
-        std::ifstream proc_maps{"/proc/self/maps"};
-        std::string line;
-
-        while (std::getline(proc_maps, line)) {
-            map_info parse_result{};
-
-            auto start = 0u;
-            auto i = 0u;
-            while (line[i] != '-') { ++i; }
-
-            std::from_chars(&line[start], &line[i], parse_result.start, 16);
-
-            start = ++i;
-            while (line[i] != '\t' && line[i] != ' ') { ++i; }
-            std::from_chars(&line[start], &line[i], parse_result.end, 16);
-
-            start = ++i;
-            while (line[i] != '\t' && line[i] != ' ') { ++i; }
-
-            if (line[start++] == 'r')
-                parse_result.prot |= PROT_READ;
-            if (line[start++] == 'w')
-                parse_result.prot |= PROT_WRITE;
-            if (line[start++] == 'x')
-                parse_result.prot |= PROT_EXEC;
-            result.push_back(parse_result);
-        }
-        return result;
-    };
 
     auto map_infos = parse_proc_maps();
 
