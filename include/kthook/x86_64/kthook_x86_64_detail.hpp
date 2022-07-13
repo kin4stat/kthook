@@ -340,7 +340,8 @@ struct frozen_threads {
     std::vector<int> thread_ids;
 };
 #else
-struct frozen_threads {};
+struct frozen_threads {
+};
 #endif
 
 inline bool freeze_threads(frozen_threads& threads) {
@@ -407,6 +408,7 @@ inline bool freeze_threads(frozen_threads& threads) {
     }
 
     auto self_pid = getpid();
+    auto self_tid = gettid();
 
     for (const auto& dir_entry : std::filesystem::directory_iterator{"/proc/self/task"}) {
         if (dir_entry.is_directory()) {
@@ -414,25 +416,15 @@ inline bool freeze_threads(frozen_threads& threads) {
             int tid;
             std::from_chars(tid_str.c_str(), tid_str.c_str() + tid_str.size(), tid);
 
-            if (tid != self_pid) {
-                if (tgkill(self_pid, tid, SIGUSR1) != 0) {
-                    // we dont need to check for errors here
-                    // because we always return false
-
-                    for (auto tid_unfreeze : threads.thread_ids) {
-                        tgkill(self_pid, tid_unfreeze, SIGUSR2);
-                    }
-
-                    sigaction(SIGUSR1, &threads.oldact1, nullptr);
-                    sigaction(SIGUSR2, &threads.oldact2, nullptr);
-                    return false;
-                }
+            if (tid != self_tid) {
+                tgkill(self_pid, tid, SIGUSR1);
                 threads.thread_ids.push_back(tid);
             }
         }
     }
 #else
-    struct frozen_threads {};
+    struct frozen_threads {
+    };
 #endif
     return true;
 }
@@ -451,19 +443,14 @@ inline bool unfreeze_threads(frozen_threads& threads) {
     auto self_pid = getpid();
 
     for (auto tid : threads.thread_ids) {
-        if (tgkill(self_pid, tid, SIGUSR2) != 0) {
-            return false;
-        }
+        tgkill(self_pid, tid, SIGUSR2);
     }
 
-    if (sigaction(SIGUSR1, &threads.oldact1, nullptr) != 0) {
-        return false;
-    }
-    if (sigaction(SIGUSR2, &threads.oldact2, nullptr) != 0) {
-        return false;
-    }
+    sigaction(SIGUSR1, &threads.oldact1, nullptr);
+    sigaction(SIGUSR2, &threads.oldact2, nullptr);
 #else
-    struct frozen_threads {};
+    struct frozen_threads {
+    };
 #endif
     return true;
 }
