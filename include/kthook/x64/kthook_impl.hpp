@@ -414,9 +414,9 @@ private:
 #ifdef KTHOOK_64_WIN
             jump_gen->mov(rax, reinterpret_cast<std::uintptr_t>(this));
             // set rsp to next stack argument pointer
-            jump_gen->add(rsp, static_cast<std::uint32_t>(sizeof(void*) * (registers.size() - 1)));
-            // push our hook to the stack
-            jump_gen->mov(ptr[rsp], rax);
+            jump_gen->add(rsp, static_cast<std::uint32_t>(sizeof(void*) * (registers.size())));
+            jump_gen->push(0);
+            jump_gen->push(rax);
 #else
             jump_gen->mov(rax, reinterpret_cast<std::uintptr_t>(this));
             // push our hook to the stack
@@ -447,7 +447,7 @@ private:
             jump_gen->db(reinterpret_cast<std::uintptr_t>(relay_ptr), 8);
             jump_gen->L(ret_addr);
 #ifdef KTHOOK_64_WIN
-            jump_gen->add(rsp, sizeof(void*));
+            jump_gen->add(rsp, sizeof(void*) * 2);
 #else
             jump_gen->add(rsp, 32);
 #endif
@@ -704,9 +704,9 @@ private:
 #ifdef KTHOOK_64_WIN
             jump_gen->mov(rax, reinterpret_cast<std::uintptr_t>(this));
             // set rsp to next stack argument pointer
-            jump_gen->add(rsp, static_cast<std::uint32_t>(sizeof(void*) * (registers.size() - 1)));
-            // push our hook to the stack
-            jump_gen->mov(ptr[rsp], rax);
+            jump_gen->add(rsp, static_cast<std::uint32_t>(sizeof(void*) * (registers.size())));
+            jump_gen->push(0);
+            jump_gen->push(rax);
 #else
             jump_gen->mov(rax, reinterpret_cast<std::uintptr_t>(this));
             // push our hook to the stack
@@ -737,7 +737,7 @@ private:
             jump_gen->db(reinterpret_cast<std::uintptr_t>(relay_ptr), 8);
             jump_gen->L(ret_addr);
 #ifdef KTHOOK_64_WIN
-            jump_gen->add(rsp, sizeof(void*));
+            jump_gen->add(rsp, sizeof(void*) * 2);
 #else
             jump_gen->add(rsp, 32);
 #endif
