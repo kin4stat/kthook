@@ -176,6 +176,7 @@ inline bool create_trampoline(std::uintptr_t hook_address,
 enum kthook_option {
     kNone = 0,
     kCreateContext = 1 << 0,
+    kFreezeThreads = 1 << 1,
 };
 
 template <typename FunctionPtrT, kthook_option Options = kthook_option::kNone>
@@ -189,6 +190,7 @@ class kthook_simple {
         detail::traits::function_connect_t<Ret, detail::traits::tuple_cat_t<const kthook_simple&, converted_args>>>;
 
     static constexpr auto create_context = Options & kthook_option::kCreateContext;
+    static constexpr auto freeze_threads = Options & kthook_option::kFreezeThreads;
 
     struct hook_info {
         std::uintptr_t hook_address;
@@ -418,6 +420,13 @@ private:
             if (!this->relay_jump) {
                 this->relay_jump = generate_relay_jump();
                 this->hook_size = detail::detect_hook_size(info.hook_address);
+
+                detail::frozen_threads threads;
+
+                if constexpr (freeze_threads)
+                    if (!detail::freeze_threads(threads))
+                        return false;
+
                 if (!set_memory_prot(reinterpret_cast<void*>(info.hook_address), this->hook_size,
                                      detail::MemoryProt::PROTECT_RWE))
                     return false;
@@ -436,6 +445,10 @@ private:
                 if (!detail::set_memory_prot(reinterpret_cast<void*>(info.hook_address), this->hook_size,
                                              detail::MemoryProt::PROTECT_RE))
                     return false;
+
+                if constexpr (freeze_threads)
+                    if (!detail::unfreeze_threads(threads))
+                        return false;
             } else {
                 jump_gen->rewrite(0, original, 8);
             }
@@ -472,6 +485,7 @@ class kthook_signal {
     using after_t = typename detail::traits::on_after_t<kthook_signal, Ret, converted_args>;
 
     static constexpr auto create_context = Options & kthook_option::kCreateContext;
+    static constexpr auto freeze_threads = Options & kthook_option::kFreezeThreads;
 
     struct hook_info {
         std::uintptr_t hook_address;
@@ -683,6 +697,13 @@ private:
 #pragma pack(pop)
             if (!this->relay_jump) {
                 this->relay_jump = generate_relay_jump();
+
+                detail::frozen_threads threads;
+
+                if constexpr (freeze_threads)
+                    if (!detail::freeze_threads(threads))
+                        return false;
+
                 this->hook_size = detail::detect_hook_size(info.hook_address);
                 if (!set_memory_prot(reinterpret_cast<void*>(info.hook_address), this->hook_size,
                                      detail::MemoryProt::PROTECT_RWE))
@@ -702,6 +723,10 @@ private:
                 if (!detail::set_memory_prot(reinterpret_cast<void*>(info.hook_address), this->hook_size,
                                              detail::MemoryProt::PROTECT_RE))
                     return false;
+
+                if constexpr (freeze_threads)
+                    if (!detail::unfreeze_threads(threads))
+                        return false;
             } else {
                 jump_gen->rewrite(0, original, 8);
             }
@@ -840,7 +865,7 @@ private:
         jump_gen->mov(ptr[reinterpret_cast<std::uintptr_t>(&context.esp)], esp);
         jump_gen->mov(eax, ret_addr);
 
-        jump_gen->mov(ptr[reinterpret_cast<std::uintptr_t>(&last_return_address)], info.hook_address + hook_size);
+        jump_gen->mov(dword[reinterpret_cast<std::uintptr_t>(&last_return_address)], info.hook_address + hook_size);
 
         jump_gen->push(reinterpret_cast<std::uintptr_t>(this));
         jump_gen->push(eax);
@@ -872,6 +897,12 @@ private:
 #pragma pack(pop)
             if (!this->relay_jump) {
                 this->relay_jump = generate_relay_jump();
+
+                detail::frozen_threads threads;
+
+                if (!detail::freeze_threads(threads))
+                    return false;
+
                 this->hook_size = detail::detect_hook_size(info.hook_address);
                 if (!set_memory_prot(reinterpret_cast<void*>(info.hook_address), this->hook_size,
                                      detail::MemoryProt::PROTECT_RWE))
@@ -890,6 +921,9 @@ private:
                        this->hook_size - sizeof(patch));
                 if (!detail::set_memory_prot(reinterpret_cast<void*>(info.hook_address), this->hook_size,
                                              detail::MemoryProt::PROTECT_RE))
+                    return false;
+
+                if (!detail::unfreeze_threads(threads))
                     return false;
             } else {
                 jump_gen->rewrite(0, original, 8);

@@ -6,6 +6,7 @@
 #else
 #define hde_disasm(code, hs) hde64_disasm(code, hs)
 #endif
+#include <tlhelp32.h>
 
 namespace kthook {
 namespace detail {
@@ -238,7 +239,7 @@ inline bool check_is_executable(const void* addr) {
     auto parse_proc_maps = []() {
         std::vector<map_info> result;
 
-        std::ifstream proc_maps{ "/proc/self/maps" };
+        std::ifstream proc_maps{"/proc/self/maps"};
         std::string line;
 
         while (std::getline(proc_maps, line)) {
@@ -326,6 +327,144 @@ inline bool set_memory_prot(const void* addr, std::size_t size, MemoryProt prote
 #else
     return true;
 #endif
+}
+
+#if defined(_WIN32)
+struct frozen_threads {
+    std::vector<DWORD> thread_ids;
+};
+#elif defined(__linux__)
+struct frozen_threads {
+    struct sigaction oldact1, oldact2;
+    std::vector<int> thread_ids;
+};
+#else
+struct frozen_threads {};
+#endif
+
+inline bool freeze_threads(frozen_threads& threads) {
+#if defined(_WIN32)
+    auto enumerate_threads = [](frozen_threads& threads) {
+
+        HANDLE hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0);
+        if (hSnapshot == INVALID_HANDLE_VALUE) return false;
+
+        auto self_tid = GetCurrentThreadId();
+        auto self_pid = GetCurrentProcessId();
+        auto offset = FIELD_OFFSET(THREADENTRY32, th32OwnerProcessID) + sizeof(DWORD);
+
+        THREADENTRY32 te;
+        te.dwSize = sizeof(THREADENTRY32);
+
+        if (Thread32First(hSnapshot, &te)) {
+            do {
+                if (te.dwSize >= offset && te.th32OwnerProcessID == self_pid && te.th32ThreadID != self_tid) {
+                    threads.thread_ids.push_back(te.th32ThreadID);
+                }
+                te.dwSize = sizeof(THREADENTRY32);
+
+            } while (Thread32Next(hSnapshot, &te));
+        }
+        CloseHandle(hSnapshot);
+        return true;
+    };
+
+    if (!enumerate_threads(threads)) {
+        return false;
+    }
+    for (auto tid : threads.thread_ids) {
+        HANDLE hThread = OpenThread(
+            THREAD_SUSPEND_RESUME | THREAD_GET_CONTEXT | THREAD_QUERY_INFORMATION | THREAD_SET_CONTEXT, FALSE, tid);
+        if (hThread != NULL) {
+            SuspendThread(hThread);
+            CloseHandle(hThread);
+        }
+    }
+#elif defined(__linux__)
+    auto signal_callback = [](int signal) {
+        switch (signal) {
+            case SIGUSR1:
+                pause();
+            break;
+            case SIGUSR2:
+                break;
+        }
+    };
+
+    struct sigaction act;
+    if (sigemptyset(&act.sa_mask) != 0) {
+        return false;
+    }
+    act.sa_flags = 0;
+    act.sa_handler = signal_callback;
+
+    if (sigaction(SIGUSR1, &act, &threads.oldact1) != 0) {
+        return false;
+    }
+    if (sigaction(SIGUSR2, &act, &threads.oldact2) != 0) {
+        return false;
+    }
+
+    auto self_pid = getpid();
+
+    for (const auto& dir_entry : std::filesystem::directory_iterator{"/proc/self/task"}) {
+        if (dir_entry.is_directory()) {
+            auto tid_str = dir_entry.path().stem().string();
+            int tid;
+            std::from_chars(tid_str.c_str(), tid_str.c_str() + tid_str.size(), tid);
+
+            if (tid != self_pid) {
+                if (tgkill(self_pid, tid, SIGUSR1) != 0) {
+                    // we dont need to check for errors here
+                    // because we always return false
+
+                    for (auto tid_unfreeze : threads.thread_ids) {
+                        tgkill(self_pid, tid_unfreeze, SIGUSR2);
+                    }
+
+                    sigaction(SIGUSR1, &threads.oldact1, nullptr);
+                    sigaction(SIGUSR2, &threads.oldact2, nullptr);
+                    return false;
+                }
+                threads.thread_ids.push_back(tid);
+            }
+        }
+    }
+#else
+    struct frozen_threads {};
+#endif
+    return true;
+}
+
+inline bool unfreeze_threads(frozen_threads& threads) {
+#if defined(_WIN32)
+    for (auto tid : threads.thread_ids) {
+        HANDLE hThread = OpenThread(
+            THREAD_SUSPEND_RESUME | THREAD_GET_CONTEXT | THREAD_QUERY_INFORMATION | THREAD_SET_CONTEXT, FALSE, tid);
+        if (hThread != NULL) {
+            ResumeThread(hThread);
+            CloseHandle(hThread);
+        }
+    }
+#elif defined(__linux__)
+    auto self_pid = getpid();
+
+    for (auto tid : threads.thread_ids) {
+        if (tgkill(self_pid, tid, SIGUSR2) != 0) {
+            return false;
+        }
+    }
+
+    if (sigaction(SIGUSR1, &threads.oldact1, nullptr) != 0) {
+        return false;
+    }
+    if (sigaction(SIGUSR2, &threads.oldact2, nullptr) != 0) {
+        return false;
+    }
+#else
+    struct frozen_threads {};
+#endif
+    return true;
 }
 
 inline struct JumpAllocator : Xbyak::Allocator {

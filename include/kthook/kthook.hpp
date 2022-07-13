@@ -25,10 +25,15 @@
 #define WIN32_LEAN_AND_MEAN
 #endif
 #include <windows.h>
+#include <tlhelp32.h>
 #else
 #include <charconv>
 #include <fstream>
 #include <sys/mman.h>
+#ifdef __linux__
+#include <unistd.h>
+#include <signal.h>
+#endif
 #endif
 
 #include <array>
@@ -39,6 +44,7 @@
 #include <memory>
 #include <optional>
 #include <tuple>
+#include <vector>
 #include <type_traits>
 
 #if defined(KTHOOK_64)
