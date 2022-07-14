@@ -401,9 +401,9 @@ private:
         using head = detail::traits::get_first_n_types_t<args_info.head_size, Args>;
         using tail = detail::traits::get_last_n_types_t<args_info.tail_size, Args, function::args_count>;
 
-        auto relay_ptr =
-            reinterpret_cast<void*>(&detail::common_relay_generator<kthook_simple, Ret, head, tail, Args>::relay);
         if constexpr (args_info.register_idx_if_full == -1) {
+            auto relay_ptr =
+                reinterpret_cast<void*>(&detail::common_relay_generator<kthook_simple, Ret, head, tail, Args>::relay);
             using_ptr_to_return_address = false;
 
             // save context
@@ -468,7 +468,17 @@ private:
             jump_gen->mov(rax, ptr[reinterpret_cast<std::uintptr_t>(&context.rax)]);
             jump_gen->mov(registers[args_info.register_idx_if_full], reinterpret_cast<std::uintptr_t>(this));
             jump_gen->jmp(ptr[rip]);
-            jump_gen->db(reinterpret_cast<std::uintptr_t>(relay_ptr), 8);
+            if constexpr (args_info.register_idx_if_full == 2) {
+                auto relay_ptr =
+                    reinterpret_cast<void*>(&detail::common_relay_generator_three_args<
+                        kthook_simple, Ret, head, tail, Args>::relay);
+                jump_gen->db(reinterpret_cast<std::uintptr_t>(relay_ptr), 8);
+            } else {
+                auto relay_ptr =
+                    reinterpret_cast<void*>(&detail::common_relay_generator<
+                        kthook_simple, Ret, head, tail, Args>::relay);
+                jump_gen->db(reinterpret_cast<std::uintptr_t>(relay_ptr), 8);
+            }
         }
         detail::flush_intruction_cache(jump_gen->getCode(), jump_gen->getSize());
         return jump_gen->getCode();
@@ -700,9 +710,10 @@ private:
         using head = detail::traits::get_first_n_types_t<args_info.head_size, Args>;
         using tail = detail::traits::get_last_n_types_t<args_info.tail_size, Args, function::args_count>;
 
-        auto relay_ptr =
-            reinterpret_cast<void*>(&detail::signal_relay_generator<kthook_signal, Ret, head, tail, Args>::relay);
         if constexpr (args_info.register_idx_if_full == -1) {
+
+            auto relay_ptr =
+                reinterpret_cast<void*>(&detail::signal_relay_generator<kthook_signal, Ret, head, tail, Args>::relay);
             using_ptr_to_return_address = false;
 
             // save context
@@ -767,7 +778,17 @@ private:
             jump_gen->mov(rax, ptr[reinterpret_cast<std::uintptr_t>(&context.rax)]);
             jump_gen->mov(registers[args_info.register_idx_if_full], reinterpret_cast<std::uintptr_t>(this));
             jump_gen->jmp(ptr[rip]);
-            jump_gen->db(reinterpret_cast<std::uintptr_t>(relay_ptr), 8);
+            if constexpr (args_info.register_idx_if_full == 2) {
+                auto relay_ptr =
+                    reinterpret_cast<void*>(&detail::signal_relay_generator_three_args<
+                        kthook_signal, Ret, head, tail, Args>::relay);
+                jump_gen->db(reinterpret_cast<std::uintptr_t>(relay_ptr), 8);
+            } else {
+                auto relay_ptr =
+                    reinterpret_cast<void*>(&detail::signal_relay_generator<
+                        kthook_signal, Ret, head, tail, Args>::relay);
+                jump_gen->db(reinterpret_cast<std::uintptr_t>(relay_ptr), 8);
+            }
         }
         detail::flush_intruction_cache(jump_gen->getCode(), jump_gen->getSize());
         return jump_gen->getCode();

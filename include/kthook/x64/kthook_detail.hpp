@@ -159,6 +159,23 @@ struct common_relay_generator<HookType, Ret, std::tuple<Head...>, std::tuple<Tai
 }; // namespace detail
 
 template <typename HookType, typename Ret, typename Head, typename Tail, typename Args>
+struct common_relay_generator_three_args {
+};
+
+template <typename HookType, typename Ret, typename... Head, typename... Tail, typename... Args>
+struct common_relay_generator_three_args<HookType, Ret, std::tuple<Head...>, std::tuple<Tail...>, std::tuple<Args...>> {
+#ifndef _WIN32
+        static Ret relay(Head... head_args, SystemVAbiTrick<HookType> rsp_ptr, Tail... tail_args) {
+            auto this_hook = rsp_ptr.ptr;
+#else
+    static Ret relay(Head ... head_args, HookType* this_hook, Tail ... tail_args) {
+#endif
+        auto& cb = this_hook->get_callback();
+        return common_relay<decltype(cb), HookType, Ret, Args...>(cb, this_hook, head_args..., tail_args...);
+    }
+}; // namespace detail
+
+template <typename HookType, typename Ret, typename Head, typename Tail, typename Args>
 struct signal_relay_generator {
 };
 
@@ -169,6 +186,21 @@ struct signal_relay_generator<HookType, Ret, std::tuple<Head...>, std::tuple<Tai
         auto this_hook = rsp_ptr.ptr;
 #else
     static Ret relay(Head ... head_args, HookType* this_hook, void*, Tail ... tail_args) {
+#endif
+        return signal_relay<HookType, Ret, Args...>(this_hook, head_args..., tail_args...);
+    }
+};
+
+template <typename HookType, typename Ret, typename Head, typename Tail, typename Args>
+struct signal_relay_generator_three_args;
+
+template <typename HookType, typename Ret, typename... Head, typename... Tail, typename... Args>
+struct signal_relay_generator_three_args<HookType, Ret, std::tuple<Head...>, std::tuple<Tail...>, std::tuple<Args...>> {
+#ifndef _WIN32
+    static Ret relay(Head... head_args, SystemVAbiTrick<HookType> rsp_ptr, Tail... tail_args) {
+        auto this_hook = rsp_ptr.ptr;
+#else
+    static Ret relay(Head ... head_args, HookType* this_hook, Tail ... tail_args) {
 #endif
         return signal_relay<HookType, Ret, Args...>(this_hook, head_args..., tail_args...);
     }
