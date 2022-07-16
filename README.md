@@ -198,6 +198,8 @@ int main() {
 }
 ```
 
+More examples can be found [here](https://github.com/kin4stat/kthook/tree/master/tests)
+
 # Credits
 
 [xbyak](https://github.com/herumi/xbyak) - x86/x86-64 JIT assembler \
