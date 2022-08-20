@@ -141,9 +141,9 @@ inline bool create_trampoline(std::uintptr_t hook_address,
         // Relative Call
         else if (hs.opcode == 0xE8) {
             std::uintptr_t call_destination = detail::restore_absolute_address(current_address, hs.imm.imm32, hs.len);
-            call.address = call_destination;
-            op_copy_src = &call;
-            op_copy_size = sizeof(call);
+            jmp.address = call_destination;
+            op_copy_src = &jmp;
+            op_copy_size = sizeof(jmp);
         }
         // Relative jmp
         else if ((hs.opcode & 0xFD) == 0xE9) {

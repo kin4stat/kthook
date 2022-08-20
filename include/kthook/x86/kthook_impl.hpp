@@ -103,10 +103,10 @@ inline bool create_trampoline(std::uintptr_t hook_address,
         // Relative Call
         else if (hs.opcode == 0xE8) {
             std::uintptr_t call_destination = detail::restore_absolute_address(current_address, hs.imm.imm32, hs.len);
-            call.operand = detail::get_relative_address(
-                call_destination, reinterpret_cast<std::uintptr_t>(trampoline_gen->getCurr()), sizeof(call));
-            op_copy_src = &call;
-            op_copy_size = sizeof(call);
+            jmp.operand = detail::get_relative_address(
+                call_destination, reinterpret_cast<std::uintptr_t>(trampoline_gen->getCurr()), sizeof(jmp));
+            op_copy_src = &jmp;
+            op_copy_size = sizeof(jmp);
         }
         // Relative jmp
         else if ((hs.opcode & 0xFD) == 0xE9) {
@@ -879,7 +879,7 @@ private:
         jump_gen->popfd();
         jump_gen->mov(esp, ptr[reinterpret_cast<std::uintptr_t>(&context.esp)]);
 
-        detail::create_trampoline(info.hook_address, jump_gen, true);
+        detail::create_trampoline(info.hook_address, jump_gen);
 
         jump_gen->jmp(ptr[&last_return_address]);
 
