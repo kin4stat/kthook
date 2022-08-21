@@ -364,7 +364,7 @@ constexpr decltype(auto) bind_impl(Input& input, std::index_sequence<Is...>) {
                     count_idx<Output, Start>() + Is,
                     std::remove_cv_t<std::remove_reference_t<decltype(input)>>
                 >>(std::get<count_idx<Output, Start>() + Is>(input))...
-        )
+            )
     };
 }
 
@@ -373,8 +373,7 @@ constexpr decltype(auto) bind(Input& input) {
     using output_type = std::remove_reference_t<std::tuple_element_t<Start, Output>>;
     if constexpr (is_take<output_type>::value) {
         return bind_impl<Input, Output, Start>(input, std::make_index_sequence<output_type::size>{});
-    }
-    else {
+    } else {
         return static_cast<
             std::tuple_element_t<
                 count_idx<Output, Start>(),
@@ -409,9 +408,10 @@ constexpr decltype(auto) unpack_impl(Output& output) {
         using tuple_type = typename get_types<Input, count_idx<Output, Start>(), std::make_index_sequence<
                                                   std::remove_reference_t<output_type>::size>>::type;
         return static_cast<take_impl<tuple_type>&&>(std::get<Start>(output)).value;
-    }
-    else {
-        return std::forward_as_tuple(static_cast<std::tuple_element_t<Start, std::remove_cv_t<std::remove_reference_t<decltype(output)>>>>(std::get<Start>(output)));
+    } else {
+        return std::forward_as_tuple(
+            static_cast<std::tuple_element_t<Start, std::remove_cv_t<std::remove_reference_t<decltype(output)>>>>(
+                std::get<Start>(output)));
     }
 }
 

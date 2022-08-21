@@ -319,7 +319,8 @@ public:
     template <typename C, typename S = decltype(&C::template operator()<const kthook_simple&>)>
     void set_cb_wrapped(C cb) {
         callback = [cb = std::forward<C>(cb)](auto&&... args) {
-            std::apply(cb, detail::bind_values<detail::traits::args<S>>(std::forward_as_tuple(std::forward<decltype(args)>(args)...)));
+            std::apply(cb, detail::bind_values<detail::traits::args<S>>(
+                           std::forward_as_tuple(std::forward<decltype(args)>(args)...)));
         };
     }
 
@@ -347,7 +348,7 @@ public:
         return reinterpret_cast<function_ptr>(const_cast<std::uint8_t*>(trampoline_gen->getCode()));
     }
 
-    template<typename... Ts>
+    template <typename... Ts>
     Ret call_trampoline(Ts&&... args) const {
         return std::apply(get_trampoline(), detail::unpack<Args>(std::forward<Ts>(args)...));
     }
