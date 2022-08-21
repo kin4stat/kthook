@@ -561,7 +561,11 @@ struct map_info {
 inline std::vector<map_info> parse_proc_maps() {
     std::vector<map_info> result;
 
+#ifdef __FreeBSD__
+    std::ifstream proc_maps{"/proc/curproc/map"};
+#else
     std::ifstream proc_maps{"/proc/self/maps"};
+#endif
     std::string line;
 
     while (std::getline(proc_maps, line)) {
@@ -569,14 +573,20 @@ inline std::vector<map_info> parse_proc_maps() {
 
         auto start = 0u;
         auto i = 0u;
-        while (line[i] != '-') { ++i; }
+        while (line[i] != ' ') { ++i; }
 
         std::from_chars(&line[start], &line[i], parse_result.start, 16);
 
         start = ++i;
         while (line[i] != '\t' && line[i] != ' ') { ++i; }
         std::from_chars(&line[start], &line[i], parse_result.end, 16);
-
+        
+#ifdef __FreeBSD__
+        while (line[i] != '\t' && line[i] != ' ') { ++i; } ++i; // skip
+        while (line[i] != '\t' && line[i] != ' ') { ++i; } ++i; // skip
+        while (line[i] != '\t' && line[i] != ' ') { ++i; } ++i; // skip
+#endif
+        
         start = ++i;
         while (line[i] != '\t' && line[i] != ' ') { ++i; }
 
