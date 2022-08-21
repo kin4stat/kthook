@@ -8,6 +8,13 @@
 #endif
 
 namespace kthook {
+
+template <std::size_t N>
+struct take {
+    static constexpr auto size = N;
+    using kthook_take_tag = void;
+};
+
 namespace detail {
 #ifdef KTHOOK_32
 using hde = hde32s;
@@ -93,7 +100,330 @@ template <typename HookType, typename Ret, typename Args>
 using on_before_t = typename on_before_type<HookType, Ret, Args>::type;
 template <typename HookType, typename Ret, typename Args>
 using on_after_t = typename on_after_type<HookType, Ret, Args>::type;
+
+template <typename Ret, typename... Args>
+struct ft {
+    using ret = Ret;
+    using args = std::tuple<Args...>;
+};
+
+template <typename T>
+struct cpp_function_traits;
+
+template <typename T, typename C>
+struct cpp_function_traits<T C::*> : cpp_function_traits<T> {
+};
+
+template <typename Ret, typename... Args>
+struct cpp_function_traits<Ret(Args ...)> : ft<Ret, Args...> {
+};
+
+// specialization for variadic functions such as std::printf
+template <typename Ret, typename... Args>
+struct cpp_function_traits<Ret(Args ..., ...)> : ft<Ret, Args...> {
+};
+
+// specialization for function types that have cv-qualifiers
+template <typename Ret, typename... Args>
+struct cpp_function_traits<Ret(Args ...) const> : ft<Ret, Args...> {
+};
+
+template <typename Ret, typename... Args>
+struct cpp_function_traits<Ret(Args ...) volatile> : ft<Ret, Args...> {
+};
+
+template <typename Ret, typename... Args>
+struct cpp_function_traits<Ret(Args ...) const volatile> : ft<Ret, Args...> {
+};
+
+template <typename Ret, typename... Args>
+struct cpp_function_traits<Ret(Args ..., ...) const> : ft<Ret, Args...> {
+};
+
+template <typename Ret, typename... Args>
+struct cpp_function_traits<Ret(Args ..., ...) volatile> : ft<Ret, Args...> {
+};
+
+template <typename Ret, typename... Args>
+struct cpp_function_traits<Ret(Args ..., ...) const volatile> : ft<Ret, Args...> {
+};
+
+// specialization for function types that have ref-qualifiers
+template <typename Ret, typename... Args>
+struct cpp_function_traits<Ret(Args ...) &> : ft<Ret, Args...> {
+};
+
+template <typename Ret, typename... Args>
+struct cpp_function_traits<Ret(Args ...) const &> : ft<Ret, Args...> {
+};
+
+template <typename Ret, typename... Args>
+struct cpp_function_traits<Ret(Args ...) volatile &> : ft<Ret, Args...> {
+};
+
+template <typename Ret, typename... Args>
+struct cpp_function_traits<Ret(Args ...) const volatile &> : ft<Ret, Args...> {
+};
+
+template <typename Ret, typename... Args>
+struct cpp_function_traits<Ret(Args ..., ...) &> : ft<Ret, Args...> {
+};
+
+template <typename Ret, typename... Args>
+struct cpp_function_traits<Ret(Args ..., ...) const &> : ft<Ret, Args...> {
+};
+
+template <typename Ret, typename... Args>
+struct cpp_function_traits<Ret(Args ..., ...) volatile &> : ft<Ret, Args...> {
+};
+
+template <typename Ret, typename... Args>
+struct cpp_function_traits<Ret(Args ..., ...) const volatile &> : ft<Ret, Args...> {
+};
+
+template <typename Ret, typename... Args>
+struct cpp_function_traits<Ret(Args ...) &&> : ft<Ret, Args...> {
+};
+
+template <typename Ret, typename... Args>
+struct cpp_function_traits<Ret(Args ...) const &&> : ft<Ret, Args...> {
+};
+
+template <typename Ret, typename... Args>
+struct cpp_function_traits<Ret(Args ...) volatile &&> : ft<Ret, Args...> {
+};
+
+template <typename Ret, typename... Args>
+struct cpp_function_traits<Ret(Args ...) const volatile &&> : ft<Ret, Args...> {
+};
+
+template <typename Ret, typename... Args>
+struct cpp_function_traits<Ret(Args ..., ...) &&> : ft<Ret, Args...> {
+};
+
+template <typename Ret, typename... Args>
+struct cpp_function_traits<Ret(Args ..., ...) const &&> : ft<Ret, Args...> {
+};
+
+template <typename Ret, typename... Args>
+struct cpp_function_traits<Ret(Args ..., ...) volatile &&> : ft<Ret, Args...> {
+};
+
+template <typename Ret, typename... Args>
+struct cpp_function_traits<Ret(Args ..., ...) const volatile &&> : ft<Ret, Args...> {
+};
+
+// specializations for noexcept versions of all the above (C++17 and later)
+
+template <typename Ret, typename... Args>
+struct cpp_function_traits<Ret(Args ...) noexcept> : ft<Ret, Args...> {
+};
+
+template <typename Ret, typename... Args>
+struct cpp_function_traits<Ret(Args ..., ...) noexcept> : ft<Ret, Args...> {
+};
+
+template <typename Ret, typename... Args>
+struct cpp_function_traits<Ret(Args ...) const noexcept> : ft<Ret, Args...> {
+};
+
+template <typename Ret, typename... Args>
+struct cpp_function_traits<Ret(Args ...) volatile noexcept> : ft<Ret, Args...> {
+};
+
+template <typename Ret, typename... Args>
+struct cpp_function_traits<Ret(Args ...) const volatile noexcept> : ft<Ret, Args...> {
+};
+
+template <typename Ret, typename... Args>
+struct cpp_function_traits<Ret(Args ..., ...) const noexcept> : ft<Ret, Args...> {
+};
+
+template <typename Ret, typename... Args>
+struct cpp_function_traits<Ret(Args ..., ...) volatile noexcept> : ft<Ret, Args...> {
+};
+
+template <typename Ret, typename... Args>
+struct cpp_function_traits<Ret(Args ..., ...) const volatile noexcept> : ft<Ret, Args...> {
+};
+
+template <typename Ret, typename... Args>
+struct cpp_function_traits<Ret(Args ...) & noexcept> : ft<Ret, Args...> {
+};
+
+template <typename Ret, typename... Args>
+struct cpp_function_traits<Ret(Args ...) const & noexcept> : ft<Ret, Args...> {
+};
+
+template <typename Ret, typename... Args>
+struct cpp_function_traits<Ret(Args ...) volatile & noexcept> : ft<Ret, Args...> {
+};
+
+template <typename Ret, typename... Args>
+struct cpp_function_traits<Ret(Args ...) const volatile & noexcept> : ft<Ret, Args...> {
+};
+
+template <typename Ret, typename... Args>
+struct cpp_function_traits<Ret(Args ..., ...) & noexcept> : ft<Ret, Args...> {
+};
+
+template <typename Ret, typename... Args>
+struct cpp_function_traits<Ret(Args ..., ...) const & noexcept> : ft<Ret, Args...> {
+};
+
+template <typename Ret, typename... Args>
+struct cpp_function_traits<Ret(Args ..., ...) volatile & noexcept> : ft<Ret, Args...> {
+};
+
+template <typename Ret, typename... Args>
+struct cpp_function_traits<Ret(Args ..., ...) const volatile & noexcept> : ft<Ret, Args...> {
+};
+
+template <typename Ret, typename... Args>
+struct cpp_function_traits<Ret(Args ...) && noexcept> : ft<Ret, Args...> {
+};
+
+template <typename Ret, typename... Args>
+struct cpp_function_traits<Ret(Args ...) const && noexcept> : ft<Ret, Args...> {
+};
+
+template <typename Ret, typename... Args>
+struct cpp_function_traits<Ret(Args ...) volatile && noexcept> : ft<Ret, Args...> {
+};
+
+template <typename Ret, typename... Args>
+struct cpp_function_traits<Ret(Args ...) const volatile && noexcept> : ft<Ret, Args...> {
+};
+
+template <typename Ret, typename... Args>
+struct cpp_function_traits<Ret(Args ..., ...) && noexcept> : ft<Ret, Args...> {
+};
+
+template <typename Ret, typename... Args>
+struct cpp_function_traits<Ret(Args ..., ...) const && noexcept> : ft<Ret, Args...> {
+};
+
+template <typename Ret, typename... Args>
+struct cpp_function_traits<Ret(Args ..., ...) volatile && noexcept> : ft<Ret, Args...> {
+};
+
+template <typename Ret, typename... Args>
+struct cpp_function_traits<Ret(Args ..., ...) const volatile && noexcept> : ft<Ret, Args...> {
+};
+
+template <typename T>
+using ret = typename cpp_function_traits<T>::ret;
+
+template <typename T>
+using args = typename cpp_function_traits<T>::args;
 } // namespace traits
+
+template <class, class = void>
+struct is_take : std::false_type {
+};
+
+template <class T>
+struct is_take<T, std::void_t<typename std::remove_reference_t<T>::kthook_take_tag>> : std::true_type {
+};
+
+template <typename Tuple>
+struct take_impl : take<std::tuple_size_v<Tuple>> {
+    Tuple value;
+
+    explicit take_impl(Tuple value)
+        : value(std::move(value)) {
+    }
+};
+
+template <bool is_take, typename T>
+struct get_size {
+    static constexpr auto value = 1;
+};
+
+template <typename T>
+struct get_size<true, T> {
+    static constexpr auto value = T::size;
+};
+
+template <typename Output, std::size_t Start, std::size_t... Is>
+constexpr std::size_t count_idx_impl(std::index_sequence<Is...>) {
+    return (get_size<is_take<std::tuple_element_t<Is, Output>>::value, std::remove_reference_t<std::tuple_element_t<
+                         Is, Output>>>::value + ... + 0);
+}
+
+template <typename Output, std::size_t Start>
+constexpr std::size_t count_idx() {
+    return count_idx_impl<Output, Start>(std::make_index_sequence<Start>{});
+}
+
+template <typename Input, typename Output, std::size_t Start, std::size_t... Is>
+constexpr decltype(auto) bind_impl(Input& input, std::index_sequence<Is...>) {
+    return take_impl{
+        std::forward_as_tuple(static_cast<
+                std::tuple_element_t<
+                    count_idx<Output, Start>() + Is,
+                    std::remove_cv_t<std::remove_reference_t<decltype(input)>>
+                >>(std::get<count_idx<Output, Start>() + Is>(input))...
+        )
+    };
+}
+
+template <typename Input, typename Output, std::size_t Start>
+constexpr decltype(auto) bind(Input& input) {
+    using output_type = std::remove_reference_t<std::tuple_element_t<Start, Output>>;
+    if constexpr (is_take<output_type>::value) {
+        return bind_impl<Input, Output, Start>(input, std::make_index_sequence<output_type::size>{});
+    }
+    else {
+        return static_cast<
+            std::tuple_element_t<
+                count_idx<Output, Start>(),
+                std::remove_cv_t<std::remove_reference_t<decltype(input)>>
+            >>(std::get<count_idx<Output, Start>()>(input));
+    }
+}
+
+template <typename Output, typename Input, std::size_t... Is>
+constexpr decltype(auto) bind_values_impl(Input& input, std::index_sequence<Is...>) {
+    return std::forward_as_tuple(bind<Input, Output, Is>(input)...);
+}
+
+template <typename Output, typename Input>
+constexpr decltype(auto) bind_values(Input input) {
+    return bind_values_impl<Output, Input>(input, std::make_index_sequence<std::tuple_size_v<Output>>{});
+}
+
+template <typename Input, std::size_t Start, typename>
+struct get_types {
+};
+
+template <typename Input, std::size_t Start, std::size_t... Is>
+struct get_types<Input, Start, std::index_sequence<Is...>> {
+    using type = std::tuple<std::tuple_element_t<Start + Is, Input>...>;
+};
+
+template <typename Input, std::size_t Start, typename Output>
+constexpr decltype(auto) unpack_impl(Output& output) {
+    using output_type = std::tuple_element_t<Start, Output>;
+    if constexpr (is_take<output_type>::value) {
+        using tuple_type = typename get_types<Input, count_idx<Output, Start>(), std::make_index_sequence<
+                                                  std::remove_reference_t<output_type>::size>>::type;
+        return static_cast<take_impl<tuple_type>&&>(std::get<Start>(output)).value;
+    }
+    else {
+        return std::forward_as_tuple(static_cast<std::tuple_element_t<Start, std::remove_cv_t<std::remove_reference_t<decltype(output)>>>>(std::get<Start>(output)));
+    }
+}
+
+template <typename Input, typename Output, std::size_t... Is>
+constexpr decltype(auto) unpack(Output output, std::index_sequence<Is...>) {
+    return std::tuple_cat(unpack_impl<Input, Is>(output)...);
+}
+
+template <typename Input, typename... Ts>
+constexpr decltype(auto) unpack(Ts&&... args) {
+    return unpack<Input>(std::forward_as_tuple(std::forward<Ts>(args)...), std::make_index_sequence<sizeof...(Ts)>{});
+}
 
 template <typename HookPtrType, typename Ret, typename... Args>
 inline Ret signal_relay(HookPtrType* this_hook, Args&... args) {

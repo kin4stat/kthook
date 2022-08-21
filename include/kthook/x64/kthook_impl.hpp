@@ -316,6 +316,13 @@ public:
 
     void set_cb(cb_type callback_) { callback = std::move(callback_); }
 
+    template <typename C, typename S = decltype(&C::template operator()<const kthook_simple&>)>
+    void set_cb_wrapped(C cb) {
+        callback = [cb = std::forward<C>(cb)](auto&&... args) {
+            std::apply(cb, detail::bind_values<detail::traits::args<S>>(std::forward_as_tuple(std::forward<decltype(args)>(args)...)));
+        };
+    }
+
     void set_dest(std::uintptr_t address) { info = {address, nullptr}; }
 
     void set_dest(void* address) { set_dest(reinterpret_cast<std::uintptr_t>(address)); }
@@ -338,6 +345,11 @@ public:
 
     function_ptr get_trampoline() const {
         return reinterpret_cast<function_ptr>(const_cast<std::uint8_t*>(trampoline_gen->getCode()));
+    }
+
+    template<typename... Ts>
+    Ret call_trampoline(Ts&&... args) const {
+        return std::apply(get_trampoline(), detail::unpack<Args>(std::forward<Ts>(args)...));
     }
 
     cb_type& get_callback() { return callback; }
@@ -493,8 +505,8 @@ private:
             } patch;
 #pragma pack(pop)
             if (!this->relay_jump) {
-                this->relay_jump = generate_relay_jump();
                 this->hook_size = detail::detect_hook_size(info.hook_address);
+                this->relay_jump = generate_relay_jump();
                 detail::frozen_threads threads;
 
                 if constexpr (freeze_threads)
@@ -803,8 +815,8 @@ private:
             } patch;
 #pragma pack(pop)
             if (!this->relay_jump) {
-                this->relay_jump = generate_relay_jump();
                 this->hook_size = detail::detect_hook_size(info.hook_address);
+                this->relay_jump = generate_relay_jump();
 
                 detail::frozen_threads threads;
 
@@ -1023,8 +1035,8 @@ private:
             } patch;
 #pragma pack(pop)
             if (!this->relay_jump) {
-                this->relay_jump = generate_relay_jump();
                 this->hook_size = detail::detect_hook_size(info.hook_address);
+                this->relay_jump = generate_relay_jump();
 
                 detail::frozen_threads threads;
 

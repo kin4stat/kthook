@@ -61,6 +61,20 @@ TEST(KthookSimpleLotsArgsTest, CREATE_NAME(HandlesKthookSimple)) {
     EXPECT_EQ(counter, 1);
 }
 
+TEST(KthookSimpleLotsArgsTest, CREATE_NAME(Skip)) {
+    kthook::kthook_simple<decltype(&A::test_func)> hook{&A::test_func};
+    hook.install();
+
+    int counter = 0;
+    hook.set_cb_wrapped([&counter](const auto& h, kthook::take<8> v1_v8, float v9, kthook::take<7> v10_v16) {
+
+        return h.call_trampoline(v1_v8, v9, v10_v16);
+    });
+
+    std::apply(&A::test_func, test_args);
+    EXPECT_EQ(counter, 1);
+}
+
 TEST(KthookSignalLotsArgsTest, CREATE_NAME(HandlesKthookSignalBefore)) {
     kthook::kthook_signal<decltype(&A::test_func)> hook{&A::test_func};
     int counter = 0;
