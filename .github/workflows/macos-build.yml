@@ -1,0 +1,52 @@
+name: MacOS
+
+on:
+  workflow_dispatch
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { title: "macos"       , os: "macos-latest", cc: "clang"  , arch: "x64", build_type: "Debug"  , defs: "KTHOOK_TEST=ON" }
+          - { title: "macos"       , os: "macos-latest", cc: "clang"  , arch: "x64", build_type: "Release", defs: "KTHOOK_TEST=ON" }
+    name: "${{matrix.title}} (${{matrix.cc}}, ${{matrix.arch}}, ${{matrix.build_type}})"
+    runs-on: "${{matrix.os}}"
+
+    steps:
+    - name: Check out the repo
+      uses: actions/checkout@v2
+      with:
+        submodules: recursive
+        path: "source"
+
+    - name: "Checkout build-actions"
+      run: git clone https://github.com/build-actions/build-actions.git build-actions --depth=1
+
+    - name: "Python"
+      uses: actions/setup-python@v2
+      with:
+        python-version: "3.x"
+
+    - name: "Prepare"
+      run: python build-actions/action.py
+                  --step=prepare
+                  --compiler=${{matrix.cc}}
+                  --architecture=${{matrix.arch}}
+
+    - name: "Configure"
+      run: python build-actions/action.py
+                  --step=configure
+                  --config=source/.github/workflows/build-config.json
+                  --source-dir=source
+                  --compiler=${{matrix.cc}}
+                  --architecture=${{matrix.arch}}
+                  --build-type=${{matrix.build_type}}
+                  --build-defs=${{matrix.defs}}
+
+    - name: "Build"
+      run: python build-actions/action.py --step=build
+
+    - name: "Test"
+      run: python build-actions/action.py --step=test

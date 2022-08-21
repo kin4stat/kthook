@@ -103,10 +103,10 @@ inline bool create_trampoline(std::uintptr_t hook_address,
         // Relative Call
         else if (hs.opcode == 0xE8) {
             std::uintptr_t call_destination = detail::restore_absolute_address(current_address, hs.imm.imm32, hs.len);
-            call.operand = detail::get_relative_address(
-                call_destination, reinterpret_cast<std::uintptr_t>(trampoline_gen->getCurr()), sizeof(call));
-            op_copy_src = &call;
-            op_copy_size = sizeof(call);
+            jmp.operand = detail::get_relative_address(
+                call_destination, reinterpret_cast<std::uintptr_t>(trampoline_gen->getCurr()), sizeof(jmp));
+            op_copy_src = &jmp;
+            op_copy_size = sizeof(jmp);
         }
         // Relative jmp
         else if ((hs.opcode & 0xFD) == 0xE9) {
@@ -279,6 +279,13 @@ public:
 
     void set_cb(cb_type callback_) { callback = std::move(callback_); }
 
+    template <typename C, typename S = decltype(&C::template operator()<const kthook_simple&>)>
+    void set_cb_wrapped(C cb) {
+        callback = [cb = std::forward<C>(cb)](auto&&... args) {
+            std::apply(cb, detail::bind_values<detail::traits::args<S>>(std::forward_as_tuple(std::forward<decltype(args)>(args)...)));
+        };
+    }
+
     void set_dest(std::uintptr_t address) { info = {address, nullptr}; }
 
     void set_dest(void* address) { set_dest(reinterpret_cast<std::uintptr_t>(address)); }
@@ -291,6 +298,11 @@ public:
 
     const function_ptr get_trampoline() const {
         return reinterpret_cast<function_ptr>(const_cast<std::uint8_t*>(trampoline_gen->getCode()));
+    }
+
+    template<typename... Ts>
+    Ret call_trampoline(Ts&&... args) const {
+        return std::apply(get_trampoline(), detail::unpack<Args>(std::forward<Ts>(args)...));
     }
 
     cb_type& get_callback() { return callback; }
@@ -418,8 +430,8 @@ private:
             } patch;
 #pragma pack(pop)
             if (!this->relay_jump) {
-                this->relay_jump = generate_relay_jump();
                 this->hook_size = detail::detect_hook_size(info.hook_address);
+                this->relay_jump = generate_relay_jump();
 
                 detail::frozen_threads threads;
 
@@ -696,6 +708,7 @@ private:
             } patch;
 #pragma pack(pop)
             if (!this->relay_jump) {
+                this->hook_size = detail::detect_hook_size(info.hook_address);
                 this->relay_jump = generate_relay_jump();
 
                 detail::frozen_threads threads;
@@ -704,7 +717,6 @@ private:
                     if (!detail::freeze_threads(threads))
                         return false;
 
-                this->hook_size = detail::detect_hook_size(info.hook_address);
                 if (!set_memory_prot(reinterpret_cast<void*>(info.hook_address), this->hook_size,
                                      detail::MemoryProt::PROTECT_RWE))
                     return false;
@@ -879,7 +891,7 @@ private:
         jump_gen->popfd();
         jump_gen->mov(esp, ptr[reinterpret_cast<std::uintptr_t>(&context.esp)]);
 
-        detail::create_trampoline(info.hook_address, jump_gen, true);
+        detail::create_trampoline(info.hook_address, jump_gen);
 
         jump_gen->jmp(ptr[&last_return_address]);
 
@@ -896,6 +908,7 @@ private:
             } patch;
 #pragma pack(pop)
             if (!this->relay_jump) {
+                this->hook_size = detail::detect_hook_size(info.hook_address);
                 this->relay_jump = generate_relay_jump();
 
                 detail::frozen_threads threads;
@@ -903,7 +916,6 @@ private:
                 if (!detail::freeze_threads(threads))
                     return false;
 
-                this->hook_size = detail::detect_hook_size(info.hook_address);
                 if (!set_memory_prot(reinterpret_cast<void*>(info.hook_address), this->hook_size,
                                      detail::MemoryProt::PROTECT_RWE))
                     return false;

@@ -141,9 +141,9 @@ inline bool create_trampoline(std::uintptr_t hook_address,
         // Relative Call
         else if (hs.opcode == 0xE8) {
             std::uintptr_t call_destination = detail::restore_absolute_address(current_address, hs.imm.imm32, hs.len);
-            call.address = call_destination;
-            op_copy_src = &call;
-            op_copy_size = sizeof(call);
+            jmp.address = call_destination;
+            op_copy_src = &jmp;
+            op_copy_size = sizeof(jmp);
         }
         // Relative jmp
         else if ((hs.opcode & 0xFD) == 0xE9) {
@@ -316,6 +316,14 @@ public:
 
     void set_cb(cb_type callback_) { callback = std::move(callback_); }
 
+    template <typename C, typename S = decltype(&C::template operator()<const kthook_simple&>)>
+    void set_cb_wrapped(C cb) {
+        callback = [cb = std::forward<C>(cb)](auto&&... args) {
+            std::apply(cb, detail::bind_values<detail::traits::args<S>>(
+                           std::forward_as_tuple(std::forward<decltype(args)>(args)...)));
+        };
+    }
+
     void set_dest(std::uintptr_t address) { info = {address, nullptr}; }
 
     void set_dest(void* address) { set_dest(reinterpret_cast<std::uintptr_t>(address)); }
@@ -338,6 +346,11 @@ public:
 
     function_ptr get_trampoline() const {
         return reinterpret_cast<function_ptr>(const_cast<std::uint8_t*>(trampoline_gen->getCode()));
+    }
+
+    template <typename... Ts>
+    Ret call_trampoline(Ts&&... args) const {
+        return std::apply(get_trampoline(), detail::unpack<Args>(std::forward<Ts>(args)...));
     }
 
     cb_type& get_callback() { return callback; }
@@ -401,9 +414,9 @@ private:
         using head = detail::traits::get_first_n_types_t<args_info.head_size, Args>;
         using tail = detail::traits::get_last_n_types_t<args_info.tail_size, Args, function::args_count>;
 
-        auto relay_ptr =
-            reinterpret_cast<void*>(&detail::common_relay_generator<kthook_simple, Ret, head, tail, Args>::relay);
         if constexpr (args_info.register_idx_if_full == -1) {
+            auto relay_ptr =
+                reinterpret_cast<void*>(&detail::common_relay_generator<kthook_simple, Ret, head, tail, Args>::relay);
             using_ptr_to_return_address = false;
 
             // save context
@@ -468,7 +481,17 @@ private:
             jump_gen->mov(rax, ptr[reinterpret_cast<std::uintptr_t>(&context.rax)]);
             jump_gen->mov(registers[args_info.register_idx_if_full], reinterpret_cast<std::uintptr_t>(this));
             jump_gen->jmp(ptr[rip]);
-            jump_gen->db(reinterpret_cast<std::uintptr_t>(relay_ptr), 8);
+            if constexpr (args_info.register_idx_if_full == 2) {
+                auto relay_ptr =
+                    reinterpret_cast<void*>(&detail::common_relay_generator_three_args<
+                        kthook_simple, Ret, head, tail, Args>::relay);
+                jump_gen->db(reinterpret_cast<std::uintptr_t>(relay_ptr), 8);
+            } else {
+                auto relay_ptr =
+                    reinterpret_cast<void*>(&detail::common_relay_generator<
+                        kthook_simple, Ret, head, tail, Args>::relay);
+                jump_gen->db(reinterpret_cast<std::uintptr_t>(relay_ptr), 8);
+            }
         }
         detail::flush_intruction_cache(jump_gen->getCode(), jump_gen->getSize());
         return jump_gen->getCode();
@@ -483,8 +506,8 @@ private:
             } patch;
 #pragma pack(pop)
             if (!this->relay_jump) {
-                this->relay_jump = generate_relay_jump();
                 this->hook_size = detail::detect_hook_size(info.hook_address);
+                this->relay_jump = generate_relay_jump();
                 detail::frozen_threads threads;
 
                 if constexpr (freeze_threads)
@@ -700,9 +723,10 @@ private:
         using head = detail::traits::get_first_n_types_t<args_info.head_size, Args>;
         using tail = detail::traits::get_last_n_types_t<args_info.tail_size, Args, function::args_count>;
 
-        auto relay_ptr =
-            reinterpret_cast<void*>(&detail::signal_relay_generator<kthook_signal, Ret, head, tail, Args>::relay);
         if constexpr (args_info.register_idx_if_full == -1) {
+
+            auto relay_ptr =
+                reinterpret_cast<void*>(&detail::signal_relay_generator<kthook_signal, Ret, head, tail, Args>::relay);
             using_ptr_to_return_address = false;
 
             // save context
@@ -767,7 +791,17 @@ private:
             jump_gen->mov(rax, ptr[reinterpret_cast<std::uintptr_t>(&context.rax)]);
             jump_gen->mov(registers[args_info.register_idx_if_full], reinterpret_cast<std::uintptr_t>(this));
             jump_gen->jmp(ptr[rip]);
-            jump_gen->db(reinterpret_cast<std::uintptr_t>(relay_ptr), 8);
+            if constexpr (args_info.register_idx_if_full == 2) {
+                auto relay_ptr =
+                    reinterpret_cast<void*>(&detail::signal_relay_generator_three_args<
+                        kthook_signal, Ret, head, tail, Args>::relay);
+                jump_gen->db(reinterpret_cast<std::uintptr_t>(relay_ptr), 8);
+            } else {
+                auto relay_ptr =
+                    reinterpret_cast<void*>(&detail::signal_relay_generator<
+                        kthook_signal, Ret, head, tail, Args>::relay);
+                jump_gen->db(reinterpret_cast<std::uintptr_t>(relay_ptr), 8);
+            }
         }
         detail::flush_intruction_cache(jump_gen->getCode(), jump_gen->getSize());
         return jump_gen->getCode();
@@ -782,8 +816,8 @@ private:
             } patch;
 #pragma pack(pop)
             if (!this->relay_jump) {
-                this->relay_jump = generate_relay_jump();
                 this->hook_size = detail::detect_hook_size(info.hook_address);
+                this->relay_jump = generate_relay_jump();
 
                 detail::frozen_threads threads;
 
@@ -1002,8 +1036,8 @@ private:
             } patch;
 #pragma pack(pop)
             if (!this->relay_jump) {
-                this->relay_jump = generate_relay_jump();
                 this->hook_size = detail::detect_hook_size(info.hook_address);
+                this->relay_jump = generate_relay_jump();
 
                 detail::frozen_threads threads;
 

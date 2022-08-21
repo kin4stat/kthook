@@ -41,12 +41,12 @@ int main() {
     using func_type = decltype(&func1);
 
     // Creating simple hook object with function type is template parameter and function pointer in constructor
-    kthook::kthook_signal<func_type> hook{ func_ptr };
+    kthook::kthook_simple<func_type> hook{ func_ptr };
 
     // Connecting lambda callback that receiving function arguments by references
     hook.before += [](const auto& hook, float& a, float& b) {
         print_info(a, b);
-        return true;
+        return std::nullopt;
     };
 
     /*
@@ -68,8 +68,7 @@ int main() {
 
     auto cb = [](const auto& hook, float a, float b) {
         print_info(a, b);
-        hook.get_trampoline()(a, b);
-        return true;
+        return hook.get_trampoline()(a, b);
     };
 
     // Creating simple hook object with function type is template parameter and function pointer in constructor
@@ -97,7 +96,7 @@ int main() {
         print_info(a, b);
         // changing arguments
         a = 50.f, b = 30.f; 
-        return true;
+        return std::nullopt;
         });
 
     // connect after callback
@@ -107,8 +106,7 @@ int main() {
 
         // changing return_value
         return_value = 20;
-        return true;
-        });
+    });
 
     /*
     [operator () at 31]: a = 30; b = 20
@@ -131,8 +129,8 @@ int main() {
 
     kthook::kthook_simple_t<func_type> hook{ func_ptr };
 
-    hook.before.connect([](const auto& hook, float& a, float& b) { print_info(a, b); return true; });
-    hook.before.connect([](const auto& hook, float& a, float& b) { a = 20; b = 30; return true; });
+    hook.before.connect([](const auto& hook, float& a, float& b) { print_info(a, b); return std::nullopt; });
+    hook.before.connect([](const auto& hook, float& a, float& b) { a = 20; b = 30; return std::nullopt; });
     hook.after.connect([](const auto& hook, int& ret_val, float& a, float& b) { print_info(a, b); });
     hook.after.connect([](const auto& hook, int& ret_val, float& a, float& b) { print_info(a, b); });
     /*
@@ -147,15 +145,18 @@ int main() {
 }
 ```
 
-A few important notes about `kthook_signal`
+####  important notes
 - Function return type must be default-constructible
-- If any before callback returns false, and function return type is non void, the original function and after callback are not called. Default constructed value is returned
+- If any before callback wiil return false, and function return type is non void, the original function and after callback are not called. Default constructed value is returned
+- If all before callbacks will return true, original function and after callbacks will be called
 
 ### Advanced Usage
 
 There is a kthook that allows you to change the return value from a function without calling the original function \
 For generating true return value, you can use `std::make_optional(value)` function \
 For generating false return value, you can use `std::nullopt`
+
+If function return type is void, then you can just return true/false see [notes](#important-notes)
 
 ```cpp
 int main() {
@@ -196,6 +197,8 @@ int main() {
     print_return_value(ret_val)
 }
 ```
+
+More examples can be found [here](https://github.com/kin4stat/kthook/tree/master/tests)
 
 # Credits
 

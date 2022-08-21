@@ -159,6 +159,23 @@ struct common_relay_generator<HookType, Ret, std::tuple<Head...>, std::tuple<Tai
 }; // namespace detail
 
 template <typename HookType, typename Ret, typename Head, typename Tail, typename Args>
+struct common_relay_generator_three_args {
+};
+
+template <typename HookType, typename Ret, typename... Head, typename... Tail, typename... Args>
+struct common_relay_generator_three_args<HookType, Ret, std::tuple<Head...>, std::tuple<Tail...>, std::tuple<Args...>> {
+#ifndef _WIN32
+        static Ret relay(Head... head_args, SystemVAbiTrick<HookType> rsp_ptr, Tail... tail_args) {
+            auto this_hook = rsp_ptr.ptr;
+#else
+    static Ret relay(Head ... head_args, HookType* this_hook, Tail ... tail_args) {
+#endif
+        auto& cb = this_hook->get_callback();
+        return common_relay<decltype(cb), HookType, Ret, Args...>(cb, this_hook, head_args..., tail_args...);
+    }
+}; // namespace detail
+
+template <typename HookType, typename Ret, typename Head, typename Tail, typename Args>
 struct signal_relay_generator {
 };
 
@@ -169,6 +186,21 @@ struct signal_relay_generator<HookType, Ret, std::tuple<Head...>, std::tuple<Tai
         auto this_hook = rsp_ptr.ptr;
 #else
     static Ret relay(Head ... head_args, HookType* this_hook, void*, Tail ... tail_args) {
+#endif
+        return signal_relay<HookType, Ret, Args...>(this_hook, head_args..., tail_args...);
+    }
+};
+
+template <typename HookType, typename Ret, typename Head, typename Tail, typename Args>
+struct signal_relay_generator_three_args;
+
+template <typename HookType, typename Ret, typename... Head, typename... Tail, typename... Args>
+struct signal_relay_generator_three_args<HookType, Ret, std::tuple<Head...>, std::tuple<Tail...>, std::tuple<Args...>> {
+#ifndef _WIN32
+    static Ret relay(Head... head_args, SystemVAbiTrick<HookType> rsp_ptr, Tail... tail_args) {
+        auto this_hook = rsp_ptr.ptr;
+#else
+    static Ret relay(Head ... head_args, HookType* this_hook, Tail ... tail_args) {
 #endif
         return signal_relay<HookType, Ret, Args...>(this_hook, head_args..., tail_args...);
     }
@@ -187,14 +219,25 @@ inline std::uintptr_t find_prev_free(std::uintptr_t from, std::uintptr_t to, std
     }
     return 0;
 #else
+    auto map_infos = parse_proc_maps();
+
     to -= to % granularity;  // alignment
     to -= granularity;
     while (from < to) {
-        void* alloc = mmap(reinterpret_cast<void*>(to), granularity, PROT_EXEC | PROT_READ | PROT_WRITE,
-                           MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED_NOREPLACE, 0, 0);
-        if (reinterpret_cast<std::uintptr_t>(alloc) != 0xffffffffffffffff) return to;
-        if (to < granularity) break;
-        to = to - granularity;
+        bool found = false;
+        for (auto& mi : map_infos) {
+            if (mi.start <= to && to < mi.end) {
+                found = true;
+                to = mi.start - granularity;
+                if (mi.start < granularity) {
+                    return 0;
+                }
+                break;
+            }
+        }
+        if (!found) {
+            return to;
+        }
     }
     return 0;
 #endif
@@ -216,13 +259,29 @@ inline std::uintptr_t find_next_free(std::uintptr_t from, std::uintptr_t to, std
     }
     return 0;
 #else
+    auto map_infos = parse_proc_maps();
+
     from -= from % granularity;  // alignment
     from += granularity;
     while (from <= to) {
-        void* alloc = mmap(reinterpret_cast<void*>(from), granularity, PROT_EXEC | PROT_READ | PROT_WRITE,
-                           MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED_NOREPLACE, 0, 0);
-        if (reinterpret_cast<std::uintptr_t>(alloc) != 0xffffffffffffffff) return from;
-        from += granularity;
+        bool found = false;
+        for (auto& mi : map_infos) {
+            if (mi.start <= from && from < mi.end) {
+                found = true;
+                from = mi.end;
+                if (mi.start < granularity) {
+                    return 0;
+                }
+                break;
+            }
+        }
+        if (found) {
+            from += granularity - 1;
+            from -= from % granularity;
+        }
+        else {
+            return from;
+        }
     }
     return 0;
 #endif
@@ -288,7 +347,9 @@ inline void* try_alloc_near(std::uintptr_t address) {
             alloc = find_prev_free(min_address, alloc, kMemoryBlockSize);
             if (alloc == 0) break;
 
-            result = reinterpret_cast<void*>(alloc);
+            result = mmap(reinterpret_cast<void*>(alloc), kMemoryBlockSize, PROT_EXEC | PROT_READ | PROT_WRITE,
+                           MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED, 0, 0);
+            if (result == reinterpret_cast<void*>(0xFFFFFFFFFFFFFFFF) || reinterpret_cast<std::uintptr_t>(result) != alloc) result = nullptr;
             break;
         }
     }
@@ -298,7 +359,9 @@ inline void* try_alloc_near(std::uintptr_t address) {
             alloc = find_next_free(alloc, max_address, kMemoryBlockSize);
             if (alloc == 0) break;
 
-            result = reinterpret_cast<void*>(alloc);
+            result = mmap(reinterpret_cast<void*>(alloc), kMemoryBlockSize, PROT_EXEC | PROT_READ | PROT_WRITE,
+                           MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED, 0, 0);
+            if (result == reinterpret_cast<void*>(0xFFFFFFFFFFFFFFFF) || reinterpret_cast<std::uintptr_t>(result) != alloc) result = nullptr;
             break;
         }
     }

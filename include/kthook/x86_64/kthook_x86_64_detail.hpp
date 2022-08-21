@@ -6,9 +6,15 @@
 #else
 #define hde_disasm(code, hs) hde64_disasm(code, hs)
 #endif
-#include <tlhelp32.h>
 
 namespace kthook {
+
+template <std::size_t N>
+struct take {
+    static constexpr auto size = N;
+    using kthook_take_tag = void;
+};
+
 namespace detail {
 #ifdef KTHOOK_32
 using hde = hde32s;
@@ -94,7 +100,330 @@ template <typename HookType, typename Ret, typename Args>
 using on_before_t = typename on_before_type<HookType, Ret, Args>::type;
 template <typename HookType, typename Ret, typename Args>
 using on_after_t = typename on_after_type<HookType, Ret, Args>::type;
+
+template <typename Ret, typename... Args>
+struct ft {
+    using ret = Ret;
+    using args = std::tuple<Args...>;
+};
+
+template <typename T>
+struct cpp_function_traits;
+
+template <typename T, typename C>
+struct cpp_function_traits<T C::*> : cpp_function_traits<T> {
+};
+
+template <typename Ret, typename... Args>
+struct cpp_function_traits<Ret(Args ...)> : ft<Ret, Args...> {
+};
+
+// specialization for variadic functions such as std::printf
+template <typename Ret, typename... Args>
+struct cpp_function_traits<Ret(Args ..., ...)> : ft<Ret, Args...> {
+};
+
+// specialization for function types that have cv-qualifiers
+template <typename Ret, typename... Args>
+struct cpp_function_traits<Ret(Args ...) const> : ft<Ret, Args...> {
+};
+
+template <typename Ret, typename... Args>
+struct cpp_function_traits<Ret(Args ...) volatile> : ft<Ret, Args...> {
+};
+
+template <typename Ret, typename... Args>
+struct cpp_function_traits<Ret(Args ...) const volatile> : ft<Ret, Args...> {
+};
+
+template <typename Ret, typename... Args>
+struct cpp_function_traits<Ret(Args ..., ...) const> : ft<Ret, Args...> {
+};
+
+template <typename Ret, typename... Args>
+struct cpp_function_traits<Ret(Args ..., ...) volatile> : ft<Ret, Args...> {
+};
+
+template <typename Ret, typename... Args>
+struct cpp_function_traits<Ret(Args ..., ...) const volatile> : ft<Ret, Args...> {
+};
+
+// specialization for function types that have ref-qualifiers
+template <typename Ret, typename... Args>
+struct cpp_function_traits<Ret(Args ...) &> : ft<Ret, Args...> {
+};
+
+template <typename Ret, typename... Args>
+struct cpp_function_traits<Ret(Args ...) const &> : ft<Ret, Args...> {
+};
+
+template <typename Ret, typename... Args>
+struct cpp_function_traits<Ret(Args ...) volatile &> : ft<Ret, Args...> {
+};
+
+template <typename Ret, typename... Args>
+struct cpp_function_traits<Ret(Args ...) const volatile &> : ft<Ret, Args...> {
+};
+
+template <typename Ret, typename... Args>
+struct cpp_function_traits<Ret(Args ..., ...) &> : ft<Ret, Args...> {
+};
+
+template <typename Ret, typename... Args>
+struct cpp_function_traits<Ret(Args ..., ...) const &> : ft<Ret, Args...> {
+};
+
+template <typename Ret, typename... Args>
+struct cpp_function_traits<Ret(Args ..., ...) volatile &> : ft<Ret, Args...> {
+};
+
+template <typename Ret, typename... Args>
+struct cpp_function_traits<Ret(Args ..., ...) const volatile &> : ft<Ret, Args...> {
+};
+
+template <typename Ret, typename... Args>
+struct cpp_function_traits<Ret(Args ...) &&> : ft<Ret, Args...> {
+};
+
+template <typename Ret, typename... Args>
+struct cpp_function_traits<Ret(Args ...) const &&> : ft<Ret, Args...> {
+};
+
+template <typename Ret, typename... Args>
+struct cpp_function_traits<Ret(Args ...) volatile &&> : ft<Ret, Args...> {
+};
+
+template <typename Ret, typename... Args>
+struct cpp_function_traits<Ret(Args ...) const volatile &&> : ft<Ret, Args...> {
+};
+
+template <typename Ret, typename... Args>
+struct cpp_function_traits<Ret(Args ..., ...) &&> : ft<Ret, Args...> {
+};
+
+template <typename Ret, typename... Args>
+struct cpp_function_traits<Ret(Args ..., ...) const &&> : ft<Ret, Args...> {
+};
+
+template <typename Ret, typename... Args>
+struct cpp_function_traits<Ret(Args ..., ...) volatile &&> : ft<Ret, Args...> {
+};
+
+template <typename Ret, typename... Args>
+struct cpp_function_traits<Ret(Args ..., ...) const volatile &&> : ft<Ret, Args...> {
+};
+
+// specializations for noexcept versions of all the above (C++17 and later)
+
+template <typename Ret, typename... Args>
+struct cpp_function_traits<Ret(Args ...) noexcept> : ft<Ret, Args...> {
+};
+
+template <typename Ret, typename... Args>
+struct cpp_function_traits<Ret(Args ..., ...) noexcept> : ft<Ret, Args...> {
+};
+
+template <typename Ret, typename... Args>
+struct cpp_function_traits<Ret(Args ...) const noexcept> : ft<Ret, Args...> {
+};
+
+template <typename Ret, typename... Args>
+struct cpp_function_traits<Ret(Args ...) volatile noexcept> : ft<Ret, Args...> {
+};
+
+template <typename Ret, typename... Args>
+struct cpp_function_traits<Ret(Args ...) const volatile noexcept> : ft<Ret, Args...> {
+};
+
+template <typename Ret, typename... Args>
+struct cpp_function_traits<Ret(Args ..., ...) const noexcept> : ft<Ret, Args...> {
+};
+
+template <typename Ret, typename... Args>
+struct cpp_function_traits<Ret(Args ..., ...) volatile noexcept> : ft<Ret, Args...> {
+};
+
+template <typename Ret, typename... Args>
+struct cpp_function_traits<Ret(Args ..., ...) const volatile noexcept> : ft<Ret, Args...> {
+};
+
+template <typename Ret, typename... Args>
+struct cpp_function_traits<Ret(Args ...) & noexcept> : ft<Ret, Args...> {
+};
+
+template <typename Ret, typename... Args>
+struct cpp_function_traits<Ret(Args ...) const & noexcept> : ft<Ret, Args...> {
+};
+
+template <typename Ret, typename... Args>
+struct cpp_function_traits<Ret(Args ...) volatile & noexcept> : ft<Ret, Args...> {
+};
+
+template <typename Ret, typename... Args>
+struct cpp_function_traits<Ret(Args ...) const volatile & noexcept> : ft<Ret, Args...> {
+};
+
+template <typename Ret, typename... Args>
+struct cpp_function_traits<Ret(Args ..., ...) & noexcept> : ft<Ret, Args...> {
+};
+
+template <typename Ret, typename... Args>
+struct cpp_function_traits<Ret(Args ..., ...) const & noexcept> : ft<Ret, Args...> {
+};
+
+template <typename Ret, typename... Args>
+struct cpp_function_traits<Ret(Args ..., ...) volatile & noexcept> : ft<Ret, Args...> {
+};
+
+template <typename Ret, typename... Args>
+struct cpp_function_traits<Ret(Args ..., ...) const volatile & noexcept> : ft<Ret, Args...> {
+};
+
+template <typename Ret, typename... Args>
+struct cpp_function_traits<Ret(Args ...) && noexcept> : ft<Ret, Args...> {
+};
+
+template <typename Ret, typename... Args>
+struct cpp_function_traits<Ret(Args ...) const && noexcept> : ft<Ret, Args...> {
+};
+
+template <typename Ret, typename... Args>
+struct cpp_function_traits<Ret(Args ...) volatile && noexcept> : ft<Ret, Args...> {
+};
+
+template <typename Ret, typename... Args>
+struct cpp_function_traits<Ret(Args ...) const volatile && noexcept> : ft<Ret, Args...> {
+};
+
+template <typename Ret, typename... Args>
+struct cpp_function_traits<Ret(Args ..., ...) && noexcept> : ft<Ret, Args...> {
+};
+
+template <typename Ret, typename... Args>
+struct cpp_function_traits<Ret(Args ..., ...) const && noexcept> : ft<Ret, Args...> {
+};
+
+template <typename Ret, typename... Args>
+struct cpp_function_traits<Ret(Args ..., ...) volatile && noexcept> : ft<Ret, Args...> {
+};
+
+template <typename Ret, typename... Args>
+struct cpp_function_traits<Ret(Args ..., ...) const volatile && noexcept> : ft<Ret, Args...> {
+};
+
+template <typename T>
+using ret = typename cpp_function_traits<T>::ret;
+
+template <typename T>
+using args = typename cpp_function_traits<T>::args;
 } // namespace traits
+
+template <class, class = void>
+struct is_take : std::false_type {
+};
+
+template <class T>
+struct is_take<T, std::void_t<typename std::remove_reference_t<T>::kthook_take_tag>> : std::true_type {
+};
+
+template <typename Tuple>
+struct take_impl : take<std::tuple_size_v<Tuple>> {
+    Tuple value;
+
+    explicit take_impl(Tuple value)
+        : value(std::move(value)) {
+    }
+};
+
+template <bool is_take, typename T>
+struct get_size {
+    static constexpr auto value = 1;
+};
+
+template <typename T>
+struct get_size<true, T> {
+    static constexpr auto value = T::size;
+};
+
+template <typename Output, std::size_t Start, std::size_t... Is>
+constexpr std::size_t count_idx_impl(std::index_sequence<Is...>) {
+    return (get_size<is_take<std::tuple_element_t<Is, Output>>::value, std::remove_reference_t<std::tuple_element_t<
+                         Is, Output>>>::value + ... + 0);
+}
+
+template <typename Output, std::size_t Start>
+constexpr std::size_t count_idx() {
+    return count_idx_impl<Output, Start>(std::make_index_sequence<Start>{});
+}
+
+template <typename Input, typename Output, std::size_t Start, std::size_t... Is>
+constexpr decltype(auto) bind_impl(Input& input, std::index_sequence<Is...>) {
+    return take_impl{
+        std::forward_as_tuple(static_cast<
+                std::tuple_element_t<
+                    count_idx<Output, Start>() + Is,
+                    std::remove_cv_t<std::remove_reference_t<decltype(input)>>
+                >>(std::get<count_idx<Output, Start>() + Is>(input))...
+            )
+    };
+}
+
+template <typename Input, typename Output, std::size_t Start>
+constexpr decltype(auto) bind(Input& input) {
+    using output_type = std::remove_reference_t<std::tuple_element_t<Start, Output>>;
+    if constexpr (is_take<output_type>::value) {
+        return bind_impl<Input, Output, Start>(input, std::make_index_sequence<output_type::size>{});
+    } else {
+        return static_cast<
+            std::tuple_element_t<
+                count_idx<Output, Start>(),
+                std::remove_cv_t<std::remove_reference_t<decltype(input)>>
+            >>(std::get<count_idx<Output, Start>()>(input));
+    }
+}
+
+template <typename Output, typename Input, std::size_t... Is>
+constexpr decltype(auto) bind_values_impl(Input& input, std::index_sequence<Is...>) {
+    return std::forward_as_tuple(bind<Input, Output, Is>(input)...);
+}
+
+template <typename Output, typename Input>
+constexpr decltype(auto) bind_values(Input input) {
+    return bind_values_impl<Output, Input>(input, std::make_index_sequence<std::tuple_size_v<Output>>{});
+}
+
+template <typename Input, std::size_t Start, typename>
+struct get_types {
+};
+
+template <typename Input, std::size_t Start, std::size_t... Is>
+struct get_types<Input, Start, std::index_sequence<Is...>> {
+    using type = std::tuple<std::tuple_element_t<Start + Is, Input>...>;
+};
+
+template <typename Input, std::size_t Start, typename Output>
+constexpr decltype(auto) unpack_impl(Output& output) {
+    using output_type = std::tuple_element_t<Start, Output>;
+    if constexpr (is_take<output_type>::value) {
+        using tuple_type = typename get_types<Input, count_idx<Output, Start>(), std::make_index_sequence<
+                                                  std::remove_reference_t<output_type>::size>>::type;
+        return static_cast<take_impl<tuple_type>&&>(std::get<Start>(output)).value;
+    } else {
+        return std::forward_as_tuple(
+            static_cast<std::tuple_element_t<Start, std::remove_cv_t<std::remove_reference_t<decltype(output)>>>>(
+                std::get<Start>(output)));
+    }
+}
+
+template <typename Input, typename Output, std::size_t... Is>
+constexpr decltype(auto) unpack(Output output, std::index_sequence<Is...>) {
+    return std::tuple_cat(unpack_impl<Input, Is>(output)...);
+}
+
+template <typename Input, typename... Ts>
+constexpr decltype(auto) unpack(Ts&&... args) {
+    return unpack<Input>(std::forward_as_tuple(std::forward<Ts>(args)...), std::make_index_sequence<sizeof...(Ts)>{});
+}
 
 template <typename HookPtrType, typename Ret, typename... Args>
 inline Ret signal_relay(HookPtrType* this_hook, Args&... args) {
@@ -221,6 +550,58 @@ inline bool flush_intruction_cache(const void* ptr, std::size_t size) {
 #endif
 }
 
+#ifndef _WIN32
+struct map_info {
+    std::uintptr_t start;
+    std::uintptr_t end;
+
+    unsigned prot;
+};
+
+inline std::vector<map_info> parse_proc_maps() {
+    std::vector<map_info> result;
+
+#ifdef __FreeBSD__
+    std::ifstream proc_maps{"/proc/curproc/map"};
+#else
+    std::ifstream proc_maps{"/proc/self/maps"};
+#endif
+    std::string line;
+
+    while (std::getline(proc_maps, line)) {
+        map_info parse_result{};
+
+        auto start = 0u;
+        auto i = 0u;
+        while (line[i] != ' ') { ++i; }
+
+        std::from_chars(&line[start], &line[i], parse_result.start, 16);
+
+        start = ++i;
+        while (line[i] != '\t' && line[i] != ' ') { ++i; }
+        std::from_chars(&line[start], &line[i], parse_result.end, 16);
+        
+#ifdef __FreeBSD__
+        while (line[i] != '\t' && line[i] != ' ') { ++i; } ++i; // skip
+        while (line[i] != '\t' && line[i] != ' ') { ++i; } ++i; // skip
+        while (line[i] != '\t' && line[i] != ' ') { ++i; } ++i; // skip
+#endif
+        
+        start = ++i;
+        while (line[i] != '\t' && line[i] != ' ') { ++i; }
+
+        if (line[start++] == 'r')
+            parse_result.prot |= PROT_READ;
+        if (line[start++] == 'w')
+            parse_result.prot |= PROT_WRITE;
+        if (line[start++] == 'x')
+            parse_result.prot |= PROT_EXEC;
+        result.push_back(parse_result);
+    }
+    return result;
+}
+#endif
+
 inline bool check_is_executable(const void* addr) {
 #ifdef _WIN32
     MEMORY_BASIC_INFORMATION buffer;
@@ -228,46 +609,6 @@ inline bool check_is_executable(const void* addr) {
     return buffer.Protect == PAGE_EXECUTE || buffer.Protect == PAGE_EXECUTE_READ ||
            buffer.Protect == PAGE_EXECUTE_READWRITE || buffer.Protect == PAGE_EXECUTE_WRITECOPY;
 #else
-
-    struct map_info {
-        std::uintptr_t start;
-        std::uintptr_t end;
-
-        unsigned prot;
-    };
-
-    auto parse_proc_maps = []() {
-        std::vector<map_info> result;
-
-        std::ifstream proc_maps{"/proc/self/maps"};
-        std::string line;
-
-        while (std::getline(proc_maps, line)) {
-            map_info parse_result{};
-
-            auto start = 0u;
-            auto i = 0u;
-            while (line[i] != '-') { ++i; }
-
-            std::from_chars(&line[start], &line[i], parse_result.start, 16);
-
-            start = ++i;
-            while (line[i] != '\t' && line[i] != ' ') { ++i; }
-            std::from_chars(&line[start], &line[i], parse_result.end, 16);
-
-            start = ++i;
-            while (line[i] != '\t' && line[i] != ' ') { ++i; }
-
-            if (line[start++] == 'r')
-                parse_result.prot |= PROT_READ;
-            if (line[start++] == 'w')
-                parse_result.prot |= PROT_WRITE;
-            if (line[start++] == 'x')
-                parse_result.prot |= PROT_EXEC;
-            result.push_back(parse_result);
-        }
-        return result;
-    };
 
     auto map_infos = parse_proc_maps();
 
@@ -339,7 +680,8 @@ struct frozen_threads {
     std::vector<int> thread_ids;
 };
 #else
-struct frozen_threads {};
+struct frozen_threads {
+};
 #endif
 
 inline bool freeze_threads(frozen_threads& threads) {
@@ -406,6 +748,7 @@ inline bool freeze_threads(frozen_threads& threads) {
     }
 
     auto self_pid = getpid();
+    auto self_tid = gettid();
 
     for (const auto& dir_entry : std::filesystem::directory_iterator{"/proc/self/task"}) {
         if (dir_entry.is_directory()) {
@@ -413,25 +756,15 @@ inline bool freeze_threads(frozen_threads& threads) {
             int tid;
             std::from_chars(tid_str.c_str(), tid_str.c_str() + tid_str.size(), tid);
 
-            if (tid != self_pid) {
-                if (tgkill(self_pid, tid, SIGUSR1) != 0) {
-                    // we dont need to check for errors here
-                    // because we always return false
-
-                    for (auto tid_unfreeze : threads.thread_ids) {
-                        tgkill(self_pid, tid_unfreeze, SIGUSR2);
-                    }
-
-                    sigaction(SIGUSR1, &threads.oldact1, nullptr);
-                    sigaction(SIGUSR2, &threads.oldact2, nullptr);
-                    return false;
-                }
+            if (tid != self_tid) {
+                tgkill(self_pid, tid, SIGUSR1);
                 threads.thread_ids.push_back(tid);
             }
         }
     }
 #else
-    struct frozen_threads {};
+    struct frozen_threads {
+    };
 #endif
     return true;
 }
@@ -450,19 +783,14 @@ inline bool unfreeze_threads(frozen_threads& threads) {
     auto self_pid = getpid();
 
     for (auto tid : threads.thread_ids) {
-        if (tgkill(self_pid, tid, SIGUSR2) != 0) {
-            return false;
-        }
+        tgkill(self_pid, tid, SIGUSR2);
     }
 
-    if (sigaction(SIGUSR1, &threads.oldact1, nullptr) != 0) {
-        return false;
-    }
-    if (sigaction(SIGUSR2, &threads.oldact2, nullptr) != 0) {
-        return false;
-    }
+    sigaction(SIGUSR1, &threads.oldact1, nullptr);
+    sigaction(SIGUSR2, &threads.oldact2, nullptr);
 #else
-    struct frozen_threads {};
+    struct frozen_threads {
+    };
 #endif
     return true;
 }
