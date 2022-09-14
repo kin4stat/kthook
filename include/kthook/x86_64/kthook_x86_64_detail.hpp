@@ -573,7 +573,7 @@ inline std::vector<map_info> parse_proc_maps() {
 
         auto start = 0u;
         auto i = 0u;
-        while (line[i] != ' ') { ++i; }
+        while (line[i] != '-') { ++i; }
 
         std::from_chars(&line[start], &line[i], parse_result.start, 16);
 
