@@ -22,7 +22,7 @@ constexpr relay_args_info internal_get_head_and_tail_size(std::size_t integral_r
     bool used = false;
     if constexpr (!std::is_void_v<Ret>) {
         auto res =
-            (!(std::is_trivial_v<Ret> && std::is_standard_layout_v<Ret> && (sizeof(Ret) % 2 == 0) && sizeof(Ret) <= 8));
+            (!(std::is_trivial_v<Ret> && std::is_standard_layout_v<Ret> && (sizeof(Ret) % 2 == 0 || sizeof(Ret) == 1) && sizeof(Ret) <= 8));
         if (res) used = true;
         used_integral_registers += res;
     }

@@ -53,33 +53,24 @@ DECLARE_SIZE_ENLARGER();
 
 class A {
 public:
-    NO_OPTIMIZE static BigAggregate
-#ifdef KTHOOK_32
-        TEST_CCONV
-#endif
+    NO_OPTIMIZE static BigAggregate CCONV
         big_test_func(BigAggregate value) {
         SIZE_ENLARGER();
         return value;
     }
-    NO_OPTIMIZE static MediumAggregate
-#ifdef KTHOOK_32
-        TEST_CCONV
-#endif
+    NO_OPTIMIZE static MediumAggregate CCONV
         medium_test_func(MediumAggregate value) {
         SIZE_ENLARGER();
         return value;
     }
-    NO_OPTIMIZE static SmallAggregate
-#ifdef KTHOOK_32
-        TEST_CCONV
-#endif
+    NO_OPTIMIZE static SmallAggregate CCONV
         small_test_func(SmallAggregate value) {
         SIZE_ENLARGER();
         return value;
     }
 };
 
-TEST(KthookSimpleTest, CREATE_NAME(BigAggregate)) {
+TEST(kthook_simple, big_aggregate) {
     kthook::kthook_simple<decltype(&A::big_test_func)> hook{&A::big_test_func};
     hook.install();
 
@@ -96,7 +87,7 @@ TEST(KthookSimpleTest, CREATE_NAME(BigAggregate)) {
     EXPECT_EQ(counter, 2);
 }
 
-TEST(KthookSignalTest, CREATE_NAME(BigAggregate)) {
+TEST(kthook_signal, big_aggregate) {
     kthook::kthook_signal<decltype(&A::big_test_func)> hook{&A::big_test_func};
 
     {
@@ -123,7 +114,7 @@ TEST(KthookSignalTest, CREATE_NAME(BigAggregate)) {
     }
 }
 
-TEST(KthookSimpleTest, CREATE_NAME(MediumAggregate)) {
+TEST(kthook_simple, medium_aggregate) {
     kthook::kthook_simple<decltype(&A::medium_test_func)> hook{&A::medium_test_func};
     hook.install();
 
@@ -141,7 +132,7 @@ TEST(KthookSimpleTest, CREATE_NAME(MediumAggregate)) {
     EXPECT_EQ(counter, 2);
 }
 
-TEST(KthookSignalTest, CREATE_NAME(MediumAggregate)) {
+TEST(kthook_signal, medium_aggregate) {
     kthook::kthook_signal<decltype(&A::medium_test_func)> hook{&A::medium_test_func};
 
     {
@@ -169,7 +160,7 @@ TEST(KthookSignalTest, CREATE_NAME(MediumAggregate)) {
     }
 }
 
-TEST(KthookSimpleTest, CREATE_NAME(SmallAggregate)) {
+TEST(kthook_simple, small_aggregate) {
     kthook::kthook_simple<decltype(&A::small_test_func)> hook{&A::small_test_func};
     hook.install();
 
@@ -186,7 +177,7 @@ TEST(KthookSimpleTest, CREATE_NAME(SmallAggregate)) {
     EXPECT_EQ(counter, 2);
 }
 
-TEST(KthookSignalTest, CREATE_NAME(SmallAggregate)) {
+TEST(kthook_signal, small_aggregate) {
     kthook::kthook_signal<decltype(&A::small_test_func)> hook{&A::small_test_func};
 
     {
