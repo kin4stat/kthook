@@ -69,7 +69,7 @@ auto generate_code() {
     gen.mov(ptr[IMM(&ctx.edx)], edx);
     gen.mov(ptr[IMM(&ctx.ecx)], ecx);
     gen.mov(ptr[IMM(&ctx.eax)], eax);
-    gen.jmp(&A::test_func);
+    gen.jmp(reinterpret_cast<void*>(&A::test_func));
     return gen.getCode<decltype(&A::test_func)>();
 }
 testing::AssertionResult operator==(const kthook::cpu_ctx& lhs, const kthook::cpu_ctx& rhs) {
