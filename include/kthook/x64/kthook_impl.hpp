@@ -4,23 +4,6 @@
 namespace kthook {
 #pragma pack(push, 1)
 struct cpu_ctx {
-    std::uintptr_t rax;
-    std::uintptr_t rbx;
-    std::uintptr_t rcx;
-    std::uintptr_t rdx;
-    std::uintptr_t rsp;
-    std::uintptr_t rbp;
-    std::uintptr_t rsi;
-    std::uintptr_t rdi;
-    std::uintptr_t r8;
-    std::uintptr_t r9;
-    std::uintptr_t r10;
-    std::uintptr_t r11;
-    std::uintptr_t r12;
-    std::uintptr_t r13;
-    std::uintptr_t r14;
-    std::uintptr_t r15;
-
     struct eflags {
     public:
         std::uint32_t CF : 1;
@@ -64,9 +47,25 @@ struct cpu_ctx {
     private:
         std::uint32_t reserved5 : 10;
         std::uint32_t reserved6 : 32;
-    } flags;
+    };
 
-    std::uint8_t align;
+    std::uintptr_t rax;
+    std::uintptr_t rbx;
+    std::uintptr_t rcx;
+    std::uintptr_t rdx;
+    std::uintptr_t rsp;
+    std::uintptr_t rbp;
+    std::uintptr_t rsi;
+    std::uintptr_t rdi;
+    std::uintptr_t r8;
+    std::uintptr_t r9;
+    std::uintptr_t r10;
+    std::uintptr_t r11;
+    std::uintptr_t r12;
+    std::uintptr_t r13;
+    std::uintptr_t r14;
+    std::uintptr_t r15;
+    eflags* flags;
 };
 #pragma pack(pop)
 
@@ -379,11 +378,25 @@ private:
         detail::create_trampoline(hook_address, jump_gen);
         jump_gen->L(UserCode);
 
-        jump_gen->mov(rax, rsp);
-        jump_gen->mov(ptr[reinterpret_cast<std::uintptr_t>(&last_return_address)], rax);
         if constexpr (create_context) {
-            jump_gen->mov(rsp, reinterpret_cast<std::uintptr_t>(&context.align));
             jump_gen->pushfq();
+
+            jump_gen->push(rax);
+            jump_gen->push(rbx);
+            jump_gen->mov(rax, ptr[rsp + sizeof(std::uintptr_t)]);
+            jump_gen->xchg(rbx, rax);
+            jump_gen->mov(rax, reinterpret_cast<std::uintptr_t>(&context.flags));
+            jump_gen->mov(ptr[rax], rbx);
+            jump_gen->pop(rbx);
+            jump_gen->pop(rax);
+            jump_gen->add(rsp, sizeof(cpu_ctx::eflags));
+
+            jump_gen->mov(ptr[reinterpret_cast<std::uintptr_t>(&context.rax)], rax);
+            jump_gen->mov(rax, rsp);
+            jump_gen->mov(ptr[reinterpret_cast<std::uintptr_t>(&context.rsp)], rax);
+            jump_gen->mov(rax, ptr[reinterpret_cast<std::uintptr_t>(&context.rax)]);
+
+            jump_gen->mov(rsp, reinterpret_cast<std::uintptr_t>(&context.flags));
             jump_gen->push(r15);
             jump_gen->push(r14);
             jump_gen->push(r13);
@@ -395,14 +408,18 @@ private:
             jump_gen->push(rdi);
             jump_gen->push(rsi);
             jump_gen->push(rbp);
-            jump_gen->push(rsp);
+            jump_gen->sub(rsp, sizeof(std::uintptr_t));
             jump_gen->push(rdx);
             jump_gen->push(rcx);
             jump_gen->push(rbx);
-            jump_gen->mov(rax, ptr[reinterpret_cast<std::uintptr_t>(&last_return_address)]);
+
+            jump_gen->mov(rax, ptr[reinterpret_cast<std::uintptr_t>(&context.rsp)]);
             jump_gen->mov(rsp, rax);
-            jump_gen->mov(ptr[reinterpret_cast<std::uintptr_t>(&context.rsp)], rax);
+        } else {
+            jump_gen->mov(ptr[reinterpret_cast<std::uintptr_t>(&context.rax)], rax);
         }
+        jump_gen->mov(rax, rsp);
+        jump_gen->mov(ptr[reinterpret_cast<std::uintptr_t>(&last_return_address)], rax);
 
 #if defined(KTHOOK_64_WIN)
         constexpr std::array registers{rcx, rdx, r8, r9};
@@ -429,7 +446,7 @@ private:
 #ifdef KTHOOK_64_WIN
             jump_gen->mov(rax, reinterpret_cast<std::uintptr_t>(this));
             // set rsp to next stack argument pointer
-            jump_gen->add(rsp, static_cast<std::uint32_t>(sizeof(void*) * (registers.size())));
+            jump_gen->add(rsp, static_cast<std::uint32_t>(sizeof(void*) * registers.size()));
             jump_gen->push(0);
             jump_gen->push(rax);
 #else
@@ -443,7 +460,7 @@ private:
 
 #ifdef KTHOOK_64_WIN
             // return the rsp to its initial state
-            jump_gen->sub(rsp, static_cast<std::uint32_t>(sizeof(void*) * (registers.size())));
+            jump_gen->sub(rsp, static_cast<std::uint32_t>(sizeof(void*) * registers.size()));
 #else
 
 #endif
@@ -467,7 +484,6 @@ private:
             jump_gen->add(rsp, 32);
 #endif
             // push original return address and return
-            jump_gen->mov(ptr[reinterpret_cast<std::uintptr_t>(&context.rax)], rax);
             jump_gen->mov(rax, ptr[reinterpret_cast<std::uintptr_t>(&last_return_address)]);
             jump_gen->push(rax);
             jump_gen->mov(rax, ptr[reinterpret_cast<std::uintptr_t>(&context.rax)]);
@@ -475,7 +491,6 @@ private:
 
         } else {
             using_ptr_to_return_address = true;
-            jump_gen->mov(ptr[reinterpret_cast<std::uintptr_t>(&context.rax)], rax);
             jump_gen->mov(rax, rsp);
             jump_gen->mov(ptr[reinterpret_cast<std::uintptr_t>(&last_return_address)], rax);
             jump_gen->mov(rax, ptr[reinterpret_cast<std::uintptr_t>(&context.rax)]);
@@ -688,11 +703,26 @@ private:
         jump_gen->nop(3);
         detail::create_trampoline(hook_address, jump_gen);
         jump_gen->L(UserCode);
-        jump_gen->mov(rax, rsp);
-        jump_gen->mov(ptr[reinterpret_cast<std::uintptr_t>(&last_return_address)], rax);
+
         if constexpr (create_context) {
-            jump_gen->mov(rsp, reinterpret_cast<std::uintptr_t>(&context.align));
             jump_gen->pushfq();
+
+            jump_gen->push(rax);
+            jump_gen->push(rbx);
+            jump_gen->mov(rax, ptr[rsp + sizeof(std::uintptr_t)]);
+            jump_gen->xchg(rbx, rax);
+            jump_gen->mov(rax, reinterpret_cast<std::uintptr_t>(&context.flags));
+            jump_gen->mov(ptr[rax], rbx);
+            jump_gen->pop(rbx);
+            jump_gen->pop(rax);
+            jump_gen->add(rsp, sizeof(cpu_ctx::eflags));
+
+            jump_gen->mov(ptr[reinterpret_cast<std::uintptr_t>(&context.rax)], rax);
+            jump_gen->mov(rax, rsp);
+            jump_gen->mov(ptr[reinterpret_cast<std::uintptr_t>(&context.rsp)], rax);
+            jump_gen->mov(rax, ptr[reinterpret_cast<std::uintptr_t>(&context.rax)]);
+
+            jump_gen->mov(rsp, reinterpret_cast<std::uintptr_t>(&context.flags));
             jump_gen->push(r15);
             jump_gen->push(r14);
             jump_gen->push(r13);
@@ -704,14 +734,18 @@ private:
             jump_gen->push(rdi);
             jump_gen->push(rsi);
             jump_gen->push(rbp);
-            jump_gen->push(rsp);
+            jump_gen->sub(rsp, sizeof(std::uintptr_t));
             jump_gen->push(rdx);
             jump_gen->push(rcx);
             jump_gen->push(rbx);
-            jump_gen->mov(rax, ptr[reinterpret_cast<std::uintptr_t>(&last_return_address)]);
+
+            jump_gen->mov(rax, ptr[reinterpret_cast<std::uintptr_t>(&context.rsp)]);
             jump_gen->mov(rsp, rax);
-            jump_gen->mov(ptr[reinterpret_cast<std::uintptr_t>(&context.rsp)], rax);
+        } else {
+            jump_gen->mov(ptr[reinterpret_cast<std::uintptr_t>(&context.rax)], rax);
         }
+        jump_gen->mov(rax, rsp);
+        jump_gen->mov(ptr[reinterpret_cast<std::uintptr_t>(&last_return_address)], rax);
 
 #if defined(KTHOOK_64_WIN)
         constexpr std::array registers{rcx, rdx, r8, r9};
@@ -739,7 +773,7 @@ private:
 #ifdef KTHOOK_64_WIN
             jump_gen->mov(rax, reinterpret_cast<std::uintptr_t>(this));
             // set rsp to next stack argument pointer
-            jump_gen->add(rsp, static_cast<std::uint32_t>(sizeof(void*) * (registers.size())));
+            jump_gen->add(rsp, static_cast<std::uint32_t>(sizeof(void*) * registers.size()));
             jump_gen->push(0);
             jump_gen->push(rax);
 #else
@@ -753,7 +787,7 @@ private:
 
 #ifdef KTHOOK_64_WIN
             // return the rsp to its initial state
-            jump_gen->sub(rsp, static_cast<std::uint32_t>(sizeof(void*) * (registers.size())));
+            jump_gen->sub(rsp, static_cast<std::uint32_t>(sizeof(void*) * registers.size()));
 #else
 
 #endif
@@ -777,7 +811,6 @@ private:
             jump_gen->add(rsp, 32);
 #endif
             // push original return address and return
-            jump_gen->mov(ptr[reinterpret_cast<std::uintptr_t>(&context.rax)], rax);
             jump_gen->mov(rax, ptr[reinterpret_cast<std::uintptr_t>(&last_return_address)]);
             jump_gen->push(rax);
             jump_gen->mov(rax, ptr[reinterpret_cast<std::uintptr_t>(&context.rax)]);
@@ -785,7 +818,6 @@ private:
 
         } else {
             using_ptr_to_return_address = true;
-            jump_gen->mov(ptr[reinterpret_cast<std::uintptr_t>(&context.rax)], rax);
             jump_gen->mov(rax, rsp);
             jump_gen->mov(ptr[reinterpret_cast<std::uintptr_t>(&last_return_address)], rax);
             jump_gen->mov(rax, ptr[reinterpret_cast<std::uintptr_t>(&context.rax)]);
@@ -886,20 +918,30 @@ class kthook_naked {
     };
 
     using cb_type = std::function<void(const kthook_naked&)>;
+    friend std::uintptr_t detail::naked_relay<kthook_naked>(kthook_naked*);
 public:
     kthook_naked()
         : info(0, nullptr) {
-    }
+    };
 
-    kthook_naked(std::uintptr_t destination, bool force_enable = true)
-        : info(destination, nullptr) {
+    kthook_naked(std::uintptr_t destination, cb_type callback_, bool force_enable = true)
+        : info(destination, nullptr),
+          callback(std::move(callback_)) {
         if (force_enable) {
             install();
         }
     }
 
-    kthook_naked(void* destination, bool force_enable = true)
-        : kthook_naked(reinterpret_cast<std::uintptr_t>(destination), force_enable) {
+    kthook_naked(std::uintptr_t destination)
+        : info(destination, nullptr) {
+    }
+
+    kthook_naked(void* destination)
+        : kthook_naked(reinterpret_cast<std::uintptr_t>(destination)) {
+    }
+
+    kthook_naked(void* destination, cb_type callback, bool force_enable = true)
+        : kthook_naked(reinterpret_cast<std::uintptr_t>(destination), callback, force_enable) {
     }
 
     ~kthook_naked() { remove(); }
@@ -951,18 +993,25 @@ private:
 
         auto hook_address = info.hook_address;
 
-        Xbyak::Label UserCode, ret_addr;
+        Xbyak::Label UserCode, ret_addr, jump_in_trampoline, skip_bytes, jump_out;
         jump_gen->jmp(UserCode, Xbyak::CodeGenerator::LabelType::T_NEAR);
         jump_gen->nop(3);
         detail::create_trampoline(hook_address, jump_gen);
         jump_gen->L(UserCode);
 
-        std::uintptr_t saved_rsp;
+        jump_gen->push(std::uintptr_t{});
+        jump_gen->pushfq();
+
         jump_gen->mov(ptr[reinterpret_cast<std::uintptr_t>(&context.rax)], rax);
         jump_gen->mov(rax, rsp);
-        jump_gen->mov(ptr[reinterpret_cast<std::uintptr_t>(&saved_rsp)], rax);
-        jump_gen->mov(rsp, reinterpret_cast<std::uintptr_t>(&context.align));
-        jump_gen->pushfq();
+        jump_gen->mov(ptr[reinterpret_cast<std::uintptr_t>(&last_return_address)], rax);
+        jump_gen->mov(rax, ptr[reinterpret_cast<std::uintptr_t>(&context.rax)]);
+
+        // [rsp - 0x00] == 0
+        // [rsp - 0x08] == eflags
+        // last_return_address == rsp - 0x10
+
+        jump_gen->mov(rsp, reinterpret_cast<std::uintptr_t>(&context.flags));
         jump_gen->push(r15);
         jump_gen->push(r14);
         jump_gen->push(r13);
@@ -974,27 +1023,39 @@ private:
         jump_gen->push(rdi);
         jump_gen->push(rsi);
         jump_gen->push(rbp);
-        jump_gen->push(rsp);
+        jump_gen->sub(rsp, sizeof(std::uintptr_t));
         jump_gen->push(rdx);
         jump_gen->push(rcx);
         jump_gen->push(rbx);
-        jump_gen->mov(rax, ptr[reinterpret_cast<std::uintptr_t>(&saved_rsp)]);
+
+        jump_gen->mov(rax, ptr[reinterpret_cast<std::uintptr_t>(&last_return_address)]);
         jump_gen->mov(rsp, rax);
+        jump_gen->mov(ptr[reinterpret_cast<std::uintptr_t>(&context.flags)], rax);
+        jump_gen->add(rax, sizeof(cpu_ctx::eflags) + sizeof(std::uintptr_t));
         jump_gen->mov(ptr[reinterpret_cast<std::uintptr_t>(&context.rsp)], rax);
-        jump_gen->mov(rax, info.hook_address + hook_size);
+        jump_gen->mov(rax, info.hook_address);
         jump_gen->mov(ptr[reinterpret_cast<std::uintptr_t>(&last_return_address)], rax);
+        jump_gen->mov(rax, ret_addr);
 
 #if defined(KTHOOK_64_WIN)
         jump_gen->mov(rcx, reinterpret_cast<std::uintptr_t>(this));
-        jump_gen->sub(rsp, 32);
+        jump_gen->sub(rsp, sizeof(std::uintptr_t) * 8);
 #elif defined(KTHOOK_64_GCC)
         jump_gen->mov(rdi, reinterpret_cast<std::uintptr_t>(this));
 #endif
-        jump_gen->mov(rax, ret_addr);
+
         jump_gen->push(rax);
         jump_gen->jmp(ptr[rip]);
-        jump_gen->db(reinterpret_cast<std::uintptr_t>(&detail::naked_relay<kthook_naked>), 8);
+        jump_gen->db(reinterpret_cast<std::uintptr_t>(&detail::naked_relay<kthook_naked>), sizeof(std::uintptr_t));
         jump_gen->L(ret_addr);
+
+        jump_gen->cmp(rax, -1);
+        jump_gen->je(jump_out);
+
+        jump_gen->cmp(rax, hook_size);
+        jump_gen->jl(jump_in_trampoline);
+
+        jump_gen->L(jump_out);
 
         jump_gen->mov(rsp, reinterpret_cast<std::uintptr_t>(&context.rbx));
         jump_gen->pop(rbx);
@@ -1012,16 +1073,55 @@ private:
         jump_gen->pop(r13);
         jump_gen->pop(r14);
         jump_gen->pop(r15);
+
+        jump_gen->mov(rax, ptr[reinterpret_cast<std::uintptr_t>(&context.rsp)]);
+        jump_gen->mov(rsp, rax);
+        jump_gen->mov(rax, ptr[reinterpret_cast<std::uintptr_t>(&last_return_address)]);
+        jump_gen->push(rax);
+        jump_gen->mov(rax, ptr[reinterpret_cast<std::uintptr_t>(&context.rax)]);
+        jump_gen->sub(rsp, sizeof(cpu_ctx::eflags));
         jump_gen->popfq();
 
-        jump_gen->mov(rax, ptr[reinterpret_cast<std::uintptr_t>(&saved_rsp)]);
+        jump_gen->ret();
+
+        jump_gen->L(jump_in_trampoline);
+
         jump_gen->mov(rsp, rax);
+        jump_gen->mov(rax, skip_bytes);
+        jump_gen->add(rax, rsp);
+
+        jump_gen->mov(ptr[reinterpret_cast<std::uintptr_t>(&last_return_address)], rax);
+
+        jump_gen->mov(rsp, reinterpret_cast<std::uintptr_t>(&context.rbx));
+        jump_gen->pop(rbx);
+        jump_gen->pop(rcx);
+        jump_gen->pop(rdx);
+        jump_gen->add(rsp, 8);
+        jump_gen->pop(rbp);
+        jump_gen->pop(rsi);
+        jump_gen->pop(rdi);
+        jump_gen->pop(r8);
+        jump_gen->pop(r9);
+        jump_gen->pop(r10);
+        jump_gen->pop(r11);
+        jump_gen->pop(r12);
+        jump_gen->pop(r13);
+        jump_gen->pop(r14);
+        jump_gen->pop(r15);
+
+        jump_gen->mov(rax, ptr[reinterpret_cast<std::uintptr_t>(&context.rsp)]);
+        jump_gen->mov(rsp, rax);
+        jump_gen->mov(rax, ptr[reinterpret_cast<std::uintptr_t>(&last_return_address)]);
+        jump_gen->push(rax);
         jump_gen->mov(rax, ptr[reinterpret_cast<std::uintptr_t>(&context.rax)]);
+        jump_gen->sub(rsp, sizeof(cpu_ctx::eflags));
+        jump_gen->popfq();
 
-        detail::create_trampoline(info.hook_address, jump_gen, true);
+        jump_gen->ret();
 
-        jump_gen->jmp(ptr[rip]);
-        jump_gen->db(reinterpret_cast<std::uint8_t*>(&last_return_address), 8);
+        jump_gen->L(skip_bytes);
+
+        detail::create_trampoline(info.hook_address, jump_gen);
 
         detail::flush_intruction_cache(jump_gen->getCode(), jump_gen->getSize());
         return jump_gen->getCode();
@@ -1099,7 +1199,7 @@ private:
     std::unique_ptr<Xbyak::CodeGenerator> trampoline_gen;
 
     const std::uint8_t* relay_jump{nullptr};
-    bool installed;
+    bool installed{false};
 };
 } // namespace kthook
 

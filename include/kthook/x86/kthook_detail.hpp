@@ -71,7 +71,7 @@ struct function_traits<Ret (Class::*)(Args ...)> {
 };
 
 template <typename Ret, typename... Args>
-struct function_traits<Ret(CCDECL*)(Args ...)> {
+struct function_traits<Ret(CCDECL *)(Args ...)> {
     static constexpr auto args_count = sizeof...(Args);
     static constexpr auto convention = cconv::ccdecl;
     using args = std::tuple<Args...>;
@@ -87,7 +87,7 @@ struct function_traits<Ret(Args ...)> {
 };
 
 template <typename Ret, typename... Args>
-struct function_traits<Ret(CTHISCALL*)(Args ...)> {
+struct function_traits<Ret(CTHISCALL *)(Args ...)> {
     static constexpr auto args_count = sizeof...(Args);
     static constexpr auto convention = cconv::cthiscall;
     using args = std::tuple<Args...>;
@@ -95,7 +95,7 @@ struct function_traits<Ret(CTHISCALL*)(Args ...)> {
 };
 
 template <typename Ret, typename... Args>
-struct function_traits<Ret(CSTDCALL*)(Args ...)> {
+struct function_traits<Ret(CSTDCALL *)(Args ...)> {
     static constexpr auto args_count = sizeof...(Args);
     static constexpr auto convention = cconv::cstdcall;
     using args = std::tuple<Args...>;
@@ -103,7 +103,7 @@ struct function_traits<Ret(CSTDCALL*)(Args ...)> {
 };
 
 template <typename Ret, typename... Args>
-struct function_traits<Ret(CFASTCALL*)(Args ...)> {
+struct function_traits<Ret(CFASTCALL *)(Args ...)> {
     static constexpr auto args_count = sizeof...(Args);
     static constexpr auto convention = cconv::cfastcall;
     using args = std::tuple<Args...>;

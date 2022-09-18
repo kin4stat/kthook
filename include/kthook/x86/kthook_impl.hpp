@@ -4,18 +4,7 @@
 namespace kthook {
 #pragma pack(push, 1)
 struct cpu_ctx {
-    cpu_ctx() = default;
-
-    std::uintptr_t edi;
-    std::uintptr_t esi;
-    std::uintptr_t ebp;
-    std::uintptr_t esp;
-    std::uintptr_t ebx;
-    std::uintptr_t edx;
-    std::uintptr_t ecx;
-    std::uintptr_t eax;
-
-    struct EFLAGS {
+    struct eflags {
     public:
         std::uintptr_t CF : 1;
 
@@ -57,15 +46,27 @@ struct cpu_ctx {
 
     private:
         std::uintptr_t reserved5 : 10;
-    } flags;
+    };
 
-    std::uint8_t align;
+    cpu_ctx() = default;
+
+    std::uintptr_t edi;
+    std::uintptr_t esi;
+    std::uintptr_t ebp;
+    std::uintptr_t esp;
+    std::uintptr_t ebx;
+    std::uintptr_t edx;
+    std::uintptr_t ecx;
+    std::uintptr_t eax;
+
+    eflags* flags;
 };
 #pragma pack(pop)
 
 namespace detail {
 struct cpu_ctx_empty {
     std::uintptr_t ecx;
+    void* flags;
 };
 
 inline bool create_trampoline(std::uintptr_t hook_address,
@@ -212,6 +213,7 @@ class kthook_simple {
 public:
     kthook_simple()
         : info(0, nullptr) {
+        context.flags = new cpu_ctx::eflags{};
     };
 
     kthook_simple(std::uintptr_t destination, cb_type callback_, bool force_enable = true)
@@ -220,10 +222,12 @@ public:
         if (force_enable) {
             install();
         }
+        context.flags = new cpu_ctx::eflags{};
     }
 
     kthook_simple(std::uintptr_t destination)
         : info(destination, nullptr) {
+        context.flags = new cpu_ctx::eflags{};
     }
 
     kthook_simple(void* destination)
@@ -244,7 +248,10 @@ public:
         : kthook_simple(reinterpret_cast<void*>(destination), callback_, force_enable) {
     }
 
-    ~kthook_simple() { remove(); }
+    ~kthook_simple() {
+        remove();
+        delete reinterpret_cast<cpu_ctx::eflags*>(context.flags);
+    }
 
     bool install() {
         if (installed) return false;
@@ -282,7 +289,8 @@ public:
     template <typename C, typename S = decltype(&C::template operator()<const kthook_simple&>)>
     void set_cb_wrapped(C cb) {
         callback = [cb = std::forward<C>(cb)](auto&&... args) {
-            std::apply(cb, detail::bind_values<detail::traits::args<S>>(std::forward_as_tuple(std::forward<decltype(args)>(args)...)));
+            std::apply(cb, detail::bind_values<detail::traits::args<S>>(
+                           std::forward_as_tuple(std::forward<decltype(args)>(args)...)));
         };
     }
 
@@ -300,7 +308,7 @@ public:
         return reinterpret_cast<function_ptr>(const_cast<std::uint8_t*>(trampoline_gen->getCode()));
     }
 
-    template<typename... Ts>
+    template <typename... Ts>
     Ret call_trampoline(Ts&&... args) const {
         return std::apply(get_trampoline(), detail::unpack<Args>(std::forward<Ts>(args)...));
     }
@@ -323,19 +331,26 @@ private:
         jump_gen->L(UserCode);
 
         if constexpr (create_context) {
-            // save esp
-            jump_gen->mov(eax, esp);
-            jump_gen->mov(ptr[&last_return_address], eax);
-            jump_gen->mov(esp, reinterpret_cast<std::uintptr_t>(&context.align));
             jump_gen->pushfd();
+            jump_gen->mov(ptr[reinterpret_cast<std::uintptr_t>(&context.eax)], eax);
+            jump_gen->mov(ptr[reinterpret_cast<std::uintptr_t>(&context.ecx)], ecx);
+            jump_gen->mov(eax, ptr[reinterpret_cast<std::uintptr_t>(&context.flags)]);
+            jump_gen->mov(ecx, ptr[esp]);
+            jump_gen->mov(ptr[eax], ecx);
+            jump_gen->mov(eax, ptr[reinterpret_cast<std::uintptr_t>(&context.eax)]);
+            jump_gen->mov(ecx, ptr[reinterpret_cast<std::uintptr_t>(&context.ecx)]);
+            jump_gen->add(esp, sizeof(cpu_ctx::eflags));
+
+            jump_gen->mov(ptr[&last_return_address], esp);
+            jump_gen->mov(esp, reinterpret_cast<std::uintptr_t>(&context.flags));
             jump_gen->pushad();
             jump_gen->mov(esp, ptr[&last_return_address]);
             jump_gen->mov(ptr[reinterpret_cast<std::uintptr_t>(&context.esp)], esp);
         }
 
-        // save return address
         jump_gen->mov(eax, ptr[esp]);
         jump_gen->mov(ptr[&last_return_address], eax);
+
         constexpr bool can_be_pushed = []() {
             if constexpr (function::args_count > 0) {
                 using first = std::tuple_element_t<0, Args>;
@@ -344,14 +359,22 @@ private:
             return false;
         }();
         constexpr bool is_thiscall = (function::convention == detail::traits::cconv::cthiscall);
+        constexpr bool is_fastcall = (function::convention == detail::traits::cconv::cfastcall);
 #ifdef _WIN32
         jump_gen->pop(eax);
         if constexpr (!std::is_void_v<Ret>) {
-            if constexpr (sizeof(Ret) > 8 || !std::is_trivial_v<Ret>) {
-                jump_gen->pop(eax);
-                jump_gen->push(reinterpret_cast<std::uintptr_t>(this));
-                jump_gen->push(eax);
-                jump_gen->mov(eax, ptr[reinterpret_cast<std::uintptr_t>(&last_return_address)]);
+            constexpr bool is_fully_nontrivial = !std::is_trivial_v<Ret> || !std::is_trivially_destructible_v<Ret>;
+            if constexpr (sizeof(Ret) > 8 || is_fully_nontrivial) {
+                if constexpr ((is_thiscall || is_fastcall) && (sizeof(Ret) % 2 != 0 || is_fully_nontrivial)) {
+                    jump_gen->push(reinterpret_cast<std::uintptr_t>(this));
+                    if constexpr (is_thiscall)
+                        jump_gen->push(ecx);
+                } else {
+                    jump_gen->pop(eax);
+                    jump_gen->push(reinterpret_cast<std::uintptr_t>(this));
+                    jump_gen->push(eax);
+                    jump_gen->mov(eax, ptr[reinterpret_cast<std::uintptr_t>(&last_return_address)]);
+                }
             } else {
                 if constexpr (is_thiscall) {
                     if constexpr (can_be_pushed) {
@@ -373,8 +396,9 @@ private:
         // if Ret is class or union, memory for return value as first argument(hidden)
         // so we need to push our hook pointer after this hidden argument
         if constexpr (!std::is_void_v<Ret>) {
+            constexpr bool is_fully_nontrivial = !std::is_trivial_v<Ret> || !std::is_trivially_destructible_v<Ret>;
             if constexpr (std::is_class_v<Ret> || std::is_union_v<Ret> || sizeof(Ret) > 8) {
-                if constexpr (is_thiscall) {
+                if constexpr (is_thiscall && (sizeof(Ret) % 2 != 0 || is_fully_nontrivial)) {
                     jump_gen->push(reinterpret_cast<std::uintptr_t>(this));
                     jump_gen->push(ecx);
                 } else {
@@ -408,11 +432,7 @@ private:
             // call relay for restoring stack pointer after call
             jump_gen->call(relay_ptr);
             jump_gen->add(esp, 4);
-            jump_gen->mov(ptr[reinterpret_cast<std::uintptr_t>(&context.ecx)], ecx);
-            jump_gen->mov(ecx, ptr[&last_return_address]);
-            jump_gen->push(ecx);
-            jump_gen->mov(ecx, ptr[reinterpret_cast<std::uintptr_t>(&context.ecx)]);
-            jump_gen->ret();
+            jump_gen->jmp(ptr[&last_return_address]);
         } else {
             jump_gen->push(eax);
             jump_gen->jmp(relay_ptr);
@@ -519,6 +539,7 @@ class kthook_signal {
 public:
     kthook_signal()
         : info(0, nullptr) {
+        context.flags = new cpu_ctx::eflags{};
     }
 
     kthook_signal(std::uintptr_t destination, bool force_enable = true)
@@ -526,6 +547,7 @@ public:
         if (force_enable) {
             install();
         }
+        context.flags = new cpu_ctx::eflags{};
     }
 
     kthook_signal(void* destination, bool force_enable = true)
@@ -537,7 +559,10 @@ public:
         : kthook_signal(reinterpret_cast<void*>(destination), force_enable) {
     }
 
-    ~kthook_signal() { remove(); }
+    ~kthook_signal() {
+        remove();
+        delete reinterpret_cast<cpu_ctx::eflags*>(context.flags);
+    }
 
     bool install() {
         if (installed) return false;
@@ -600,11 +625,18 @@ private:
         jump_gen->L(UserCode);
 
         if constexpr (create_context) {
-            // save esp
-            jump_gen->mov(eax, esp);
-            jump_gen->mov(ptr[&last_return_address], eax);
-            jump_gen->mov(esp, reinterpret_cast<std::uintptr_t>(&context.align));
             jump_gen->pushfd();
+            jump_gen->mov(ptr[reinterpret_cast<std::uintptr_t>(&context.eax)], eax);
+            jump_gen->mov(ptr[reinterpret_cast<std::uintptr_t>(&context.ecx)], ecx);
+            jump_gen->mov(eax, ptr[reinterpret_cast<std::uintptr_t>(&context.flags)]);
+            jump_gen->mov(ecx, ptr[esp]);
+            jump_gen->mov(ptr[eax], ecx);
+            jump_gen->mov(eax, ptr[reinterpret_cast<std::uintptr_t>(&context.eax)]);
+            jump_gen->mov(ecx, ptr[reinterpret_cast<std::uintptr_t>(&context.ecx)]);
+            jump_gen->add(esp, sizeof(cpu_ctx::eflags));
+
+            jump_gen->mov(ptr[&last_return_address], esp);
+            jump_gen->mov(esp, reinterpret_cast<std::uintptr_t>(&context.flags));
             jump_gen->pushad();
             jump_gen->mov(esp, ptr[&last_return_address]);
             jump_gen->mov(ptr[reinterpret_cast<std::uintptr_t>(&context.esp)], esp);
@@ -613,7 +645,6 @@ private:
         jump_gen->mov(eax, ptr[esp]);
         jump_gen->mov(ptr[&last_return_address], eax);
 
-        // pop return address out
         constexpr bool can_be_pushed = []() {
             if constexpr (function::args_count > 0) {
                 using first = std::tuple_element_t<0, Args>;
@@ -622,14 +653,22 @@ private:
             return false;
         }();
         constexpr bool is_thiscall = (function::convention == detail::traits::cconv::cthiscall);
+        constexpr bool is_fastcall = (function::convention == detail::traits::cconv::cfastcall);
 #ifdef _WIN32
         jump_gen->pop(eax);
         if constexpr (!std::is_void_v<Ret>) {
-            if constexpr (sizeof(Ret) > 8 || !std::is_trivial_v<Ret>) {
-                jump_gen->pop(eax);
-                jump_gen->push(reinterpret_cast<std::uintptr_t>(this));
-                jump_gen->push(eax);
-                jump_gen->mov(eax, ptr[reinterpret_cast<std::uintptr_t>(&last_return_address)]);
+            constexpr bool is_fully_nontrivial = !std::is_trivial_v<Ret> || !std::is_trivially_destructible_v<Ret>;
+            if constexpr (sizeof(Ret) > 8 || is_fully_nontrivial) {
+                if constexpr ((is_thiscall || is_fastcall) && (sizeof(Ret) % 2 != 0 || is_fully_nontrivial)) {
+                    jump_gen->push(reinterpret_cast<std::uintptr_t>(this));
+                    if constexpr (is_thiscall)
+                        jump_gen->push(ecx);
+                } else {
+                    jump_gen->pop(eax);
+                    jump_gen->push(reinterpret_cast<std::uintptr_t>(this));
+                    jump_gen->push(eax);
+                    jump_gen->mov(eax, ptr[reinterpret_cast<std::uintptr_t>(&last_return_address)]);
+                }
             } else {
                 if constexpr (is_thiscall) {
                     if constexpr (can_be_pushed) {
@@ -686,11 +725,7 @@ private:
             // call relay for restoring stack pointer after call
             jump_gen->call(relay_ptr);
             jump_gen->add(esp, 4);
-            jump_gen->mov(ptr[reinterpret_cast<std::uintptr_t>(&context.ecx)], ecx);
-            jump_gen->mov(ecx, ptr[&last_return_address]);
-            jump_gen->push(ecx);
-            jump_gen->mov(ecx, ptr[reinterpret_cast<std::uintptr_t>(&context.ecx)]);
-            jump_gen->ret();
+            jump_gen->jmp(ptr[&last_return_address]);
         } else {
             jump_gen->push(eax);
             jump_gen->jmp(relay_ptr);
@@ -781,6 +816,7 @@ class kthook_naked {
         }
     };
 
+    friend std::uintptr_t detail::naked_relay<kthook_naked>(kthook_naked*);
 public:
     kthook_naked()
         : info(0, nullptr) {
@@ -855,7 +891,7 @@ private:
 
         auto hook_address = info.hook_address;
 
-        Xbyak::Label UserCode, ret_addr;
+        Xbyak::Label UserCode, ret_addr, jump_in_trampoline, skip_bytes, jump_out;
         // this jump gets nopped when hook.remove() is called
         jump_gen->jmp(UserCode, Xbyak::CodeGenerator::LabelType::T_NEAR);
         jump_gen->nop(3);
@@ -864,36 +900,85 @@ private:
         detail::create_trampoline(hook_address, jump_gen);
         jump_gen->L(UserCode);
 
-        // save esp
-        jump_gen->mov(ptr[reinterpret_cast<std::uintptr_t>(&context.eax)], eax);
-        jump_gen->mov(eax, esp);
-        jump_gen->mov(ptr[&last_return_address], eax);
-        jump_gen->mov(eax, ptr[reinterpret_cast<std::uintptr_t>(&context.eax)]);
-
-        jump_gen->mov(esp, reinterpret_cast<std::uintptr_t>(&context.align));
         jump_gen->pushfd();
+
+        jump_gen->mov(ptr[&last_return_address], esp);
+
+        // &context.end -> esp
+        // pushad -> context.registers
+        // memory.esp -> esp
+        // esp -> context.esp
+        // &label ret_addr  -> eax
+        // info.hook_address -> last_return_address
+        jump_gen->mov(esp, reinterpret_cast<std::uintptr_t>(&context.flags));
         jump_gen->pushad();
         jump_gen->mov(esp, ptr[&last_return_address]);
+        jump_gen->mov(ptr[reinterpret_cast<std::uintptr_t>(&context.flags)], esp);
+        jump_gen->sub(esp, sizeof(cpu_ctx::eflags));
         jump_gen->mov(ptr[reinterpret_cast<std::uintptr_t>(&context.esp)], esp);
+        jump_gen->add(esp, sizeof(cpu_ctx::eflags));
         jump_gen->mov(eax, ret_addr);
 
-        jump_gen->mov(dword[reinterpret_cast<std::uintptr_t>(&last_return_address)], info.hook_address + hook_size);
+        jump_gen->mov(dword[reinterpret_cast<std::uintptr_t>(&last_return_address)], info.hook_address);
 
+        // push this
+        // push eax(&label ret_addr)
         jump_gen->push(reinterpret_cast<std::uintptr_t>(this));
         jump_gen->push(eax);
 
+        // GOTO callback(call)
         jump_gen->jmp(reinterpret_cast<const void*>(&detail::naked_relay<kthook_naked>));
         jump_gen->L(ret_addr);
+
+        // restore stack
         jump_gen->add(esp, 0x04);
+
+        // if need to skip trampoline
+        jump_gen->cmp(eax, ~0u);
+        jump_gen->je(jump_out);
+
+        // if need to jump inside trampoline
+        jump_gen->cmp(eax, hook_size);
+        jump_gen->jl(jump_in_trampoline);
+
+        jump_gen->L(jump_out);
+
+        // esp -> &context.top
+        // context.registers -> popad
+        // context.esp -> esp
+        // stack -> popfd
+        // goto RETURN_ADDR
         jump_gen->mov(esp, reinterpret_cast<std::uintptr_t>(&context.edi));
         jump_gen->popad();
-        jump_gen->mov(esp, reinterpret_cast<std::uintptr_t>(&context.flags));
-        jump_gen->popfd();
         jump_gen->mov(esp, ptr[reinterpret_cast<std::uintptr_t>(&context.esp)]);
-
-        detail::create_trampoline(info.hook_address, jump_gen);
-
+        jump_gen->add(esp, sizeof(cpu_ctx::eflags));
+        jump_gen->popfd();
         jump_gen->jmp(ptr[&last_return_address]);
+
+        jump_gen->L(jump_in_trampoline);
+        // eax -> esp
+        // &label skip_bytes -> eax
+        // eax += esp
+        // so eax is address inside trampoline
+        jump_gen->mov(esp, eax);
+        jump_gen->mov(eax, skip_bytes);
+        jump_gen->add(eax, esp);
+
+        // eax -> RETURN_ADDR
+        // esp -> &context.top
+        // popad
+        // context.esp -> esp
+        // stack -> popfd
+        // goto RETURN_ADDR
+        jump_gen->mov(dword[reinterpret_cast<std::uintptr_t>(&last_return_address)], eax);
+        jump_gen->mov(esp, reinterpret_cast<std::uintptr_t>(&context.edi));
+        jump_gen->popad();
+        jump_gen->mov(esp, ptr[reinterpret_cast<std::uintptr_t>(&context.esp)]);
+        jump_gen->add(esp, sizeof(cpu_ctx::eflags));
+        jump_gen->popfd();
+        jump_gen->jmp(ptr[&last_return_address]);
+        jump_gen->L(skip_bytes);
+        detail::create_trampoline(info.hook_address, jump_gen);
 
         detail::flush_intruction_cache(jump_gen->getCode(), jump_gen->getSize());
         return jump_gen->getCode();

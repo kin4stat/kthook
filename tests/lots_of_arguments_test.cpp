@@ -37,17 +37,14 @@ DECLARE_SIZE_ENLARGER();
 
 class A {
 public:
-    NO_OPTIMIZE static void
-#ifdef KTHOOK_32
-        TEST_CCONV
-#endif
+    NO_OPTIMIZE static void CCONV
         test_func(int v1, float v2, long long v3, double v4, short v5, char v6, int v7, long double v8, float v9,
                   int v10, int v11, long v12, long long v13, int v14, int v15, int v16) {
         SIZE_ENLARGER();
     }
 };
 
-TEST(KthookSimpleLotsArgsTest, CREATE_NAME(HandlesKthookSimple)) {
+TEST(kthook_simple, function) {
     kthook::kthook_simple<decltype(&A::test_func)> hook{&A::test_func};
     hook.install();
 
@@ -61,12 +58,14 @@ TEST(KthookSimpleLotsArgsTest, CREATE_NAME(HandlesKthookSimple)) {
     EXPECT_EQ(counter, 1);
 }
 
-TEST(KthookSimpleLotsArgsTest, CREATE_NAME(Skip)) {
+TEST(kthook_simple, arg_skip) {
     kthook::kthook_simple<decltype(&A::test_func)> hook{&A::test_func};
     hook.install();
 
     int counter = 0;
     hook.set_cb_wrapped([&counter](const auto& h, kthook::take<8> v1_v8, float v9, kthook::take<7> v10_v16) {
+
+        ++counter;
 
         return h.call_trampoline(v1_v8, v9, v10_v16);
     });
@@ -75,7 +74,7 @@ TEST(KthookSimpleLotsArgsTest, CREATE_NAME(Skip)) {
     EXPECT_EQ(counter, 1);
 }
 
-TEST(KthookSignalLotsArgsTest, CREATE_NAME(HandlesKthookSignalBefore)) {
+TEST(kthook_signal_before, function) {
     kthook::kthook_signal<decltype(&A::test_func)> hook{&A::test_func};
     int counter = 0;
     hook.before += [&counter](const auto& hook, auto&&... args) {
@@ -87,7 +86,7 @@ TEST(KthookSignalLotsArgsTest, CREATE_NAME(HandlesKthookSignalBefore)) {
     EXPECT_EQ(counter, 1);
 }
 
-TEST(KthookSignalLotsArgsTest, CREATE_NAME(HandlesKthookSignalAfter)) {
+TEST(kthook_signal_after, function) {
     kthook::kthook_signal<decltype(&A::test_func)> hook{&A::test_func};
     int counter = 0;
     hook.after += [&counter](const auto& hook, auto&&... args) {
