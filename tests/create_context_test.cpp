@@ -17,7 +17,7 @@ class A {
 public:
     NO_OPTIMIZE static void THISCALL_REPLACEMENT
     test_func() {
-        DECLARE_SIZE_ENLARGER();
+        SIZE_ENLARGER();
     }
 };
 
@@ -57,18 +57,18 @@ auto generate_code() {
     gen.push(ebx);
     gen.mov(eax, ptr[esp + 8]);
     gen.mov(ebx, ptr[IMM(&ctx.flags)]);
-    gen.mov(ptr[rax], rbx);
+    gen.mov(ptr[ebx], eax);
     gen.pop(ebx);
     gen.pop(eax);
     gen.popfd();
-    gen.mov(ptr[IMM(&ctx.rax)], rax);
-    gen.mov(ptr[IMM(&ctx.edi)], edi)
-    gen.mov(ptr[IMM(&ctx.esi)], esi)
-    gen.mov(ptr[IMM(&ctx.ebp)], ebp)
-    gen.mov(ptr[IMM(&ctx.ebx)], ebx)
-    gen.mov(ptr[IMM(&ctx.edx)], edx)
-    gen.mov(ptr[IMM(&ctx.ecx)], ecx)
-    gen.mov(ptr[IMM(&ctx.eax)], eax)
+    gen.mov(ptr[IMM(&ctx.eax)], eax);
+    gen.mov(ptr[IMM(&ctx.edi)], edi);
+    gen.mov(ptr[IMM(&ctx.esi)], esi);
+    gen.mov(ptr[IMM(&ctx.ebp)], ebp);
+    gen.mov(ptr[IMM(&ctx.ebx)], ebx);
+    gen.mov(ptr[IMM(&ctx.edx)], edx);
+    gen.mov(ptr[IMM(&ctx.ecx)], ecx);
+    gen.mov(ptr[IMM(&ctx.eax)], eax);
     gen.jmp(&A::test_func);
     return gen.getCode<decltype(&A::test_func)>();
 }
