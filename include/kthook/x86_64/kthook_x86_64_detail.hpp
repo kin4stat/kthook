@@ -506,7 +506,11 @@ inline Ret common_relay(CallbackT& cb, HookPtrType* this_hook, Args&... args) {
 
 template <typename HookType>
 #ifdef KTHOOK_32
-std::uintptr_t CCDECL
+#ifndef __GNUC__
+std::uintptr_t __cdecl
+#else
+__attribute__((cdecl))  std::uintptr_t
+#endif
 #else
 std::uintptr_t
 #endif
