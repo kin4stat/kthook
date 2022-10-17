@@ -425,6 +425,45 @@ constexpr decltype(auto) unpack(Ts&&... args) {
     return unpack<Input>(std::forward_as_tuple(std::forward<Ts>(args)...), std::make_index_sequence<sizeof...(Ts)>{});
 }
 
+// https://github.com/TsudaKageyu/minhook/blob/master/src/trampoline.h
+#pragma pack(push, 1)
+struct JCC_ABS {
+    std::uint8_t opcode; // 7* 0E:         J** +16
+    std::uint8_t dummy0;
+    std::uint8_t dummy1; // FF25 00000000: JMP [+6]
+    std::uint8_t dummy2;
+    std::uint32_t dummy3;
+    std::uint64_t address; // Absolute destination address
+};
+
+struct CALL_ABS {
+    std::uint8_t opcode0; // FF15 00000002: CALL [+6]
+    std::uint8_t opcode1;
+    std::uint32_t dummy0;
+    std::uint8_t dummy1; // EB 08:         JMP +10
+    std::uint8_t dummy2;
+    std::uint64_t address; // Absolute destination address
+};
+
+struct JMP_ABS {
+    std::uint8_t opcode0; // FF25 00000000: JMP [+6]
+    std::uint8_t opcode1;
+    std::uint32_t dummy;
+    std::uint64_t address; // Absolute destination address
+};
+
+typedef struct {
+    std::uint8_t opcode;   // E9/E8 xxxxxxxx: JMP/CALL +5+xxxxxxxx
+    std::uint32_t operand; // Relative destination address
+} JMP_REL, CALL_REL;
+
+struct JCC_REL {
+    std::uint8_t opcode0; // 0F8* xxxxxxxx: J** +6+xxxxxxxx
+    std::uint8_t opcode1;
+    std::uint32_t operand; // Relative destination address
+};
+#pragma pack(pop)
+
 template <typename HookPtrType, typename Ret, typename... Args>
 inline Ret signal_relay(HookPtrType* this_hook, Args&... args) {
     if constexpr (std::is_void_v<Ret>) {
@@ -465,62 +504,60 @@ inline Ret common_relay(CallbackT& cb, HookPtrType* this_hook, Args&... args) {
         return this_hook->get_trampoline()(args...);
 }
 
-
 template <typename HookType>
 #ifdef KTHOOK_32
-#ifdef __GNUC__
-__attribute__((cdecl)) inline void
+#ifndef __GNUC__
+std::uintptr_t __cdecl
 #else
-inline void __cdecl
+__attribute__((cdecl))  std::uintptr_t
 #endif
 #else
-inline void
+std::uintptr_t
 #endif
 naked_relay(HookType* this_hook) {
+    auto ret_addr = this_hook->get_return_address();
+
     auto& cb = this_hook->get_callback();
     if (cb) {
         cb(*this_hook);
     }
+    if (ret_addr != this_hook->get_return_address()) {
+        ret_addr = this_hook->get_return_address();
+        auto hook_addr = this_hook->info.hook_address;
+        auto hook_size = this_hook->hook_size;
+        auto& original = this_hook->info.original_code;
+        if (ret_addr > hook_addr && ret_addr - hook_addr <= hook_size) {
+            std::uintptr_t result{};
+            auto m = (ret_addr - hook_addr < hook_size) ? ret_addr - hook_addr : hook_size;
+            for (auto i = 0u; i < m;) {
+                hde hs;
+                std::size_t op_size = hde_disasm(original.get() + i, &hs);
+                if (hs.flags & F_ERROR) return 0;
+                if (((hs.opcode & 0xF0) == 0x70) || // one byte jump
+                    ((hs.opcode & 0xFC) == 0xE0) || // LOOPNZ/LOOPZ/LOOP/JECXZ
+                    ((hs.opcode2 & 0xF0) == 0x80)) {
+                    result += sizeof(JCC_REL);
+                }
+                else if ((hs.opcode & 0xFD) == 0xE9) {
+                    result += sizeof(JMP_REL);
+                }
+                else if (hs.opcode == 0xE8) {
+                    result += sizeof(JMP_REL);
+                }
+                else {
+                    result += op_size;
+                }
+                i += op_size;
+            }
+            // if need to get into trampoline
+            return result;
+        } else {
+            return ~0u;
+        }
+    }
+    // if need to get into trampoline
+    return 0;
 }
-
-// https://github.com/TsudaKageyu/minhook/blob/master/src/trampoline.h
-#pragma pack(push, 1)
-struct JCC_ABS {
-    std::uint8_t opcode; // 7* 0E:         J** +16
-    std::uint8_t dummy0;
-    std::uint8_t dummy1; // FF25 00000000: JMP [+6]
-    std::uint8_t dummy2;
-    std::uint32_t dummy3;
-    std::uint64_t address; // Absolute destination address
-};
-
-struct CALL_ABS {
-    std::uint8_t opcode0; // FF15 00000002: CALL [+6]
-    std::uint8_t opcode1;
-    std::uint32_t dummy0;
-    std::uint8_t dummy1; // EB 08:         JMP +10
-    std::uint8_t dummy2;
-    std::uint64_t address; // Absolute destination address
-};
-
-struct JMP_ABS {
-    std::uint8_t opcode0; // FF25 00000000: JMP [+6]
-    std::uint8_t opcode1;
-    std::uint32_t dummy;
-    std::uint64_t address; // Absolute destination address
-};
-
-typedef struct {
-    std::uint8_t opcode;   // E9/E8 xxxxxxxx: JMP/CALL +5+xxxxxxxx
-    std::uint32_t operand; // Relative destination address
-} JMP_REL, CALL_REL;
-
-struct JCC_REL {
-    std::uint8_t opcode0; // 0F8* xxxxxxxx: J** +6+xxxxxxxx
-    std::uint8_t opcode1;
-    std::uint32_t operand; // Relative destination address
-};
-#pragma pack(pop)
 
 inline std::size_t detect_hook_size(std::uintptr_t addr) {
     size_t size = 0;
