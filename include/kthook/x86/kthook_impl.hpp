@@ -365,7 +365,8 @@ private:
         if constexpr (!std::is_void_v<Ret>) {
             constexpr bool is_fully_nontrivial = !std::is_trivial_v<Ret> || !std::is_trivially_destructible_v<Ret>;
             if constexpr (sizeof(Ret) > 8 || is_fully_nontrivial) {
-                if constexpr ((is_thiscall || is_fastcall) && (sizeof(Ret) % 2 != 0 || is_fully_nontrivial)) {
+                if constexpr ((is_thiscall || is_fastcall) &&
+                              ((sizeof(Ret) % 2 != 0 && sizeof(Ret) != 1) || is_fully_nontrivial)) {
                     jump_gen->push(reinterpret_cast<std::uintptr_t>(this));
                     if constexpr (is_thiscall)
                         jump_gen->push(ecx);
@@ -398,7 +399,7 @@ private:
         if constexpr (!std::is_void_v<Ret>) {
             constexpr bool is_fully_nontrivial = !std::is_trivial_v<Ret> || !std::is_trivially_destructible_v<Ret>;
             if constexpr (std::is_class_v<Ret> || std::is_union_v<Ret> || sizeof(Ret) > 8) {
-                if constexpr (is_thiscall && (sizeof(Ret) % 2 != 0 || is_fully_nontrivial)) {
+                if constexpr (is_thiscall && ((sizeof(Ret) % 2 != 0 && sizeof(Ret) != 1) || is_fully_nontrivial)) {
                     jump_gen->push(reinterpret_cast<std::uintptr_t>(this));
                     jump_gen->push(ecx);
                 } else {
@@ -430,10 +431,27 @@ private:
             reinterpret_cast<void*>(&detail::relay_generator<kthook_simple, function::convention, Ret, Args>::relay);
         if constexpr (function::convention == detail::traits::cconv::ccdecl) {
             // call relay for restoring stack pointer after call
+#ifndef _WIN32
+            jump_gen->push(0);
+            jump_gen->push(0);
+            jump_gen->push(0);
+#endif
             jump_gen->call(relay_ptr);
+#ifndef _WIN32
+            jump_gen->add(esp, 16);
+#else
             jump_gen->add(esp, 4);
+#endif
+            
             jump_gen->jmp(ptr[&last_return_address]);
         } else {
+#ifndef _WIN32
+            if constexpr (function::convention == detail::traits::cconv::cstdcall) {
+                jump_gen->push(0);
+                jump_gen->push(0);
+                jump_gen->push(0);
+            }
+#endif
             jump_gen->push(eax);
             jump_gen->jmp(relay_ptr);
         }
@@ -659,7 +677,8 @@ private:
         if constexpr (!std::is_void_v<Ret>) {
             constexpr bool is_fully_nontrivial = !std::is_trivial_v<Ret> || !std::is_trivially_destructible_v<Ret>;
             if constexpr (sizeof(Ret) > 8 || is_fully_nontrivial) {
-                if constexpr ((is_thiscall || is_fastcall) && (sizeof(Ret) % 2 != 0 || is_fully_nontrivial)) {
+                if constexpr ((is_thiscall || is_fastcall) && (
+                                  (sizeof(Ret) % 2 != 0 && sizeof(Ret) != 1) || is_fully_nontrivial)) {
                     jump_gen->push(reinterpret_cast<std::uintptr_t>(this));
                     if constexpr (is_thiscall)
                         jump_gen->push(ecx);
@@ -690,8 +709,9 @@ private:
         // if Ret is class or union, memory for return value as first argument(hidden)
         // so we need to push our hook pointer after this hidden argument
         if constexpr (!std::is_void_v<Ret>) {
+            constexpr bool is_fully_nontrivial = !std::is_trivial_v<Ret> || !std::is_trivially_destructible_v<Ret>;
             if constexpr (std::is_class_v<Ret> || std::is_union_v<Ret> || sizeof(Ret) > 8) {
-                if constexpr (is_thiscall) {
+                if constexpr (is_thiscall && ((sizeof(Ret) % 2 != 0 && sizeof(Ret) != 1) || is_fully_nontrivial)) {
                     jump_gen->push(reinterpret_cast<std::uintptr_t>(this));
                     jump_gen->push(ecx);
                 } else {
@@ -722,11 +742,26 @@ private:
         auto relay_ptr = reinterpret_cast<void*>(
             &detail::signal_relay_generator<kthook_signal, function::convention, Ret, Args>::relay);
         if constexpr (function::convention == detail::traits::cconv::ccdecl) {
-            // call relay for restoring stack pointer after call
+#ifndef _WIN32
+            jump_gen->push(0);
+            jump_gen->push(0);
+            jump_gen->push(0);
+#endif
             jump_gen->call(relay_ptr);
+#ifndef _WIN32
+            jump_gen->add(esp, 16);
+#else
             jump_gen->add(esp, 4);
+#endif
             jump_gen->jmp(ptr[&last_return_address]);
         } else {
+#ifndef _WIN32
+            if constexpr (function::convention == detail::traits::cconv::cstdcall) {
+                jump_gen->push(0);
+                jump_gen->push(0);
+                jump_gen->push(0);
+            }
+#endif
             jump_gen->push(eax);
             jump_gen->jmp(relay_ptr);
         }
@@ -817,6 +852,7 @@ class kthook_naked {
     };
 
     friend std::uintptr_t detail::naked_relay<kthook_naked>(kthook_naked*);
+
 public:
     kthook_naked()
         : info(0, nullptr) {

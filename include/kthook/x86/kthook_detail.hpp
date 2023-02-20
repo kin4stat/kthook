@@ -150,7 +150,11 @@ struct signal_relay_generator;
 
 template <typename HookPtrType, typename Ret, typename... Args>
 struct signal_relay_generator<HookPtrType, traits::cconv::ccdecl, Ret, std::tuple<Args...>> {
+#ifndef _WIN32
+    static Ret CCDECL relay(void*, void*, void*, HookPtrType* this_hook, Args ... args) {
+#else
     static Ret CCDECL relay(HookPtrType* this_hook, Args ... args) {
+#endif
         using source_t = Ret(CCDECL*)(Args ...);
         return signal_relay<HookPtrType, Ret, Args...>(this_hook, args...);
     }
@@ -158,7 +162,11 @@ struct signal_relay_generator<HookPtrType, traits::cconv::ccdecl, Ret, std::tupl
 
 template <typename HookPtrType, typename Ret, typename... Args>
 struct signal_relay_generator<HookPtrType, traits::cconv::cstdcall, Ret, std::tuple<Args...>> {
+#ifndef _WIN32
+    static Ret CSTDCALL relay(void*, void*, void*, HookPtrType* this_hook, Args ... args) {
+#else
     static Ret CSTDCALL relay(HookPtrType* this_hook, Args ... args) {
+#endif
         using source_t = Ret(CSTDCALL*)(Args ...);
         return signal_relay<HookPtrType, Ret, Args...>(this_hook, args...);
     }
@@ -189,7 +197,11 @@ struct relay_generator;
 
 template <typename HookPtrType, typename Ret, typename... Args>
 struct relay_generator<HookPtrType, traits::cconv::ccdecl, Ret, std::tuple<Args...>> {
+#ifndef _WIN32
+    static Ret CCDECL relay(void*, void*, void*, HookPtrType* this_hook, Args ... args) {
+#else
     static Ret CCDECL relay(HookPtrType* this_hook, Args ... args) {
+#endif
         auto& cb = this_hook->get_callback();
         return common_relay<decltype(cb), HookPtrType, Ret, Args...>(cb, this_hook, args...);
     }
@@ -197,7 +209,11 @@ struct relay_generator<HookPtrType, traits::cconv::ccdecl, Ret, std::tuple<Args.
 
 template <typename HookPtrType, typename Ret, typename... Args>
 struct relay_generator<HookPtrType, traits::cconv::cstdcall, Ret, std::tuple<Args...>> {
+#ifndef _WIN32
+    static Ret CSTDCALL relay(void*, void*, void*, HookPtrType* this_hook, Args ... args) {
+#else
     static Ret CSTDCALL relay(HookPtrType* this_hook, Args ... args) {
+#endif
         auto& cb = this_hook->get_callback();
         return common_relay<decltype(cb), HookPtrType, Ret, Args...>(cb, this_hook, args...);
     }
