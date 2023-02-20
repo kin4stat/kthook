@@ -430,10 +430,27 @@ private:
             reinterpret_cast<void*>(&detail::relay_generator<kthook_simple, function::convention, Ret, Args>::relay);
         if constexpr (function::convention == detail::traits::cconv::ccdecl) {
             // call relay for restoring stack pointer after call
+#ifndef _WIN32
+            jump_gen->push(0);
+            jump_gen->push(0);
+            jump_gen->push(0);
+#endif
             jump_gen->call(relay_ptr);
+#ifndef _WIN32
+            jump_gen->add(esp, 16);
+#else
             jump_gen->add(esp, 4);
+#endif
+            
             jump_gen->jmp(ptr[&last_return_address]);
         } else {
+#ifndef _WIN32
+            if constexpr (function::convention == detail::traits::cconv::cstdcall) {
+                jump_gen->push(0);
+                jump_gen->push(0);
+                jump_gen->push(0);
+            }
+#endif
             jump_gen->push(eax);
             jump_gen->jmp(relay_ptr);
         }
@@ -722,11 +739,26 @@ private:
         auto relay_ptr = reinterpret_cast<void*>(
             &detail::signal_relay_generator<kthook_signal, function::convention, Ret, Args>::relay);
         if constexpr (function::convention == detail::traits::cconv::ccdecl) {
-            // call relay for restoring stack pointer after call
+#ifndef _WIN32
+            jump_gen->push(0);
+            jump_gen->push(0);
+            jump_gen->push(0);
+#endif
             jump_gen->call(relay_ptr);
+#ifndef _WIN32
+            jump_gen->add(esp, 16);
+#else
             jump_gen->add(esp, 4);
+#endif
             jump_gen->jmp(ptr[&last_return_address]);
         } else {
+#ifndef _WIN32
+            if constexpr (function::convention == detail::traits::cconv::cstdcall) {
+                jump_gen->push(0);
+                jump_gen->push(0);
+                jump_gen->push(0);
+            }
+#endif
             jump_gen->push(eax);
             jump_gen->jmp(relay_ptr);
         }
