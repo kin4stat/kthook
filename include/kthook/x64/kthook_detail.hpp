@@ -175,6 +175,7 @@ struct common_relay_generator_three_args<HookType, Ret, std::tuple<Head...>, std
     }
 }; // namespace detail
 
+#ifdef KTHOOK_USE_SIGNALS
 template <typename HookType, typename Ret, typename Head, typename Tail, typename Args>
 struct signal_relay_generator {
 };
@@ -205,6 +206,7 @@ struct signal_relay_generator_three_args<HookType, Ret, std::tuple<Head...>, std
         return signal_relay<HookType, Ret, Args...>(this_hook, head_args..., tail_args...);
     }
 };
+#endif
 
 inline std::uintptr_t find_prev_free(std::uintptr_t from, std::uintptr_t to, std::uintptr_t granularity) {
 #ifdef KTHOOK_64_WIN

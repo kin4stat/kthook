@@ -297,6 +297,7 @@ TEST(kthook_simple, non_standard_copyable) {
     }
 }
 
+#ifdef KTHOOK_USE_SIGNALS
 TEST(kthook_signal, bool) {
     kthook::kthook_signal<decltype(&Bool::test_func)> hook{&Bool::test_func, false};
     EXPECT_TRUE(hook.install());
@@ -441,3 +442,4 @@ TEST(kthook_signal, non_standard_layout) {
         EXPECT_EQ(NonStandardLayout::test_func(test_arg), test_ret);
     }
 }
+#endif

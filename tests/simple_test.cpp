@@ -78,6 +78,7 @@ TEST(kthook_naked, fastcall_function) {
     AF::test_func(test_val);
 }
 
+#ifdef KTHOOK_USE_SIGNALS
 TEST(kthook_signal, function) {
     kthook::kthook_signal<decltype(&A::test_func)> hook{&A::test_func};
 
@@ -106,3 +107,4 @@ TEST(kthook_signal, function) {
         EXPECT_EQ(A::test_func(test_val), return_default);
     }
 }
+#endif

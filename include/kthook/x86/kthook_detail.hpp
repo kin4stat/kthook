@@ -145,6 +145,7 @@ constexpr bool is_return_value_needs_stack() {
     return (!(std::is_trivial_v<Ret> && std::is_standard_layout_v<Ret> && sizeof(Ret) <= 8));
 }
 
+#ifdef KTHOOK_USE_SIGNALS
 template <typename HookPtrType, traits::cconv Convention, typename Ret, typename... Args>
 struct signal_relay_generator;
 
@@ -191,6 +192,7 @@ struct signal_relay_generator<HookPtrType, traits::cconv::cfastcall, Ret, std::t
         return signal_relay<HookPtrType, Ret, Args...>(esp4.ptr, args...);
     }
 };
+#endif
 
 template <typename HookPtrType, traits::cconv Convention, typename Ret, typename Tuple>
 struct relay_generator;
