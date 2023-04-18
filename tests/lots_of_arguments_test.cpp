@@ -74,6 +74,7 @@ TEST(kthook_simple, arg_skip) {
     EXPECT_EQ(counter, 1);
 }
 
+#ifdef KTHOOK_USE_SIGNALS
 TEST(kthook_signal_before, function) {
     kthook::kthook_signal<decltype(&A::test_func)> hook{&A::test_func};
     int counter = 0;
@@ -96,3 +97,4 @@ TEST(kthook_signal_after, function) {
     std::apply(&A::test_func, test_args);
     EXPECT_EQ(counter, 1);
 }
+#endif

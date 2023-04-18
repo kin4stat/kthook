@@ -524,6 +524,7 @@ private:
     bool installed = false;
 };
 
+#ifdef KTHOOK_USE_SIGNALS
 template <typename FunctionPtrT, kthook_option Options = kthook_option::kNone>
 class kthook_signal {
     using function = detail::traits::function_traits<FunctionPtrT>;
@@ -832,6 +833,7 @@ private:
 
     bool installed = false;
 };
+#endif
 
 class kthook_naked {
     using cb_type = std::function<void(const kthook_naked&)>;

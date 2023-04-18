@@ -573,6 +573,7 @@ private:
     bool installed = false;
 };
 
+#ifdef KTHOOK_USE_SIGNALS
 template <typename FunctionPtrT, kthook_option Options = kthook_option::kNone>
 class kthook_signal {
     using function = detail::traits::function_traits<FunctionPtrT>;
@@ -900,6 +901,7 @@ private:
     bool using_ptr_to_return_address = true;
     bool installed = false;
 };
+#endif
 
 class kthook_naked {
     struct hook_info {

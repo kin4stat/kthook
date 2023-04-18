@@ -87,6 +87,7 @@ TEST(kthook_simple, big_aggregate) {
     EXPECT_EQ(counter, 2);
 }
 
+#ifdef KTHOOK_USE_SIGNALS
 TEST(kthook_signal, big_aggregate) {
     kthook::kthook_signal<decltype(&A::big_test_func)> hook{&A::big_test_func};
 
@@ -113,6 +114,7 @@ TEST(kthook_signal, big_aggregate) {
         EXPECT_EQ(counter, 2);
     }
 }
+#endif
 
 TEST(kthook_simple, medium_aggregate) {
     kthook::kthook_simple<decltype(&A::medium_test_func)> hook{&A::medium_test_func};
@@ -132,6 +134,7 @@ TEST(kthook_simple, medium_aggregate) {
     EXPECT_EQ(counter, 2);
 }
 
+#ifdef KTHOOK_USE_SIGNALS
 TEST(kthook_signal, medium_aggregate) {
     kthook::kthook_signal<decltype(&A::medium_test_func)> hook{&A::medium_test_func};
 
@@ -159,6 +162,7 @@ TEST(kthook_signal, medium_aggregate) {
         EXPECT_EQ(counter, 2);
     }
 }
+#endif
 
 TEST(kthook_simple, small_aggregate) {
     kthook::kthook_simple<decltype(&A::small_test_func)> hook{&A::small_test_func};
@@ -177,6 +181,7 @@ TEST(kthook_simple, small_aggregate) {
     EXPECT_EQ(counter, 2);
 }
 
+#ifdef KTHOOK_USE_SIGNALS
 TEST(kthook_signal, small_aggregate) {
     kthook::kthook_signal<decltype(&A::small_test_func)> hook{&A::small_test_func};
 
@@ -204,3 +209,4 @@ TEST(kthook_signal, small_aggregate) {
         EXPECT_EQ(counter, 2);
     }
 }
+#endif

@@ -154,6 +154,7 @@ TEST(kthook_simple, function) {
     generate_code()();
 }
 
+#ifdef KTHOOK_USE_SIGNALS
 TEST(kthook_signal, function) {
     kthook::kthook_signal<decltype(&A::test_func), kthook::kthook_option::kCreateContext> hook{&A::test_func, false};
     EXPECT_TRUE(hook.install());
@@ -167,6 +168,7 @@ TEST(kthook_signal, function) {
     std::memset(&ctx, 0, sizeof(ctx) - sizeof(ctx.flags));
     generate_code()();
 }
+#endif
 
 TEST(kthook_naked, function) {
     kthook::kthook_naked hook{reinterpret_cast<std::uintptr_t>(&A::test_func)};
