@@ -32,6 +32,9 @@
 #include <fstream>
 #include <sys/mman.h>
 #ifdef __linux__
+#define _GNU_SOURCE
+#include <sys/syscall.h>
+#include <sys/types.h>
 #include <unistd.h>
 #include <signal.h>
 #endif
