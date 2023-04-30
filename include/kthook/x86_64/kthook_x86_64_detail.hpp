@@ -785,7 +785,7 @@ inline bool freeze_threads(frozen_threads& threads) {
     }
 
     auto self_pid = getpid();
-    auto self_tid = gettid();
+    auto self_tid = syscall(sys_gettid);
 
     for (const auto& dir_entry : std::filesystem::directory_iterator{"/proc/self/task"}) {
         if (dir_entry.is_directory()) {
@@ -794,7 +794,7 @@ inline bool freeze_threads(frozen_threads& threads) {
             std::from_chars(tid_str.c_str(), tid_str.c_str() + tid_str.size(), tid);
 
             if (tid != self_tid) {
-                tgkill(self_pid, tid, SIGUSR1);
+                syscall(sys_tgkill, self_pid, tid, SIGUSR1);
                 threads.thread_ids.push_back(tid);
             }
         }
@@ -820,7 +820,7 @@ inline bool unfreeze_threads(frozen_threads& threads) {
     auto self_pid = getpid();
 
     for (auto tid : threads.thread_ids) {
-        tgkill(self_pid, tid, SIGUSR2);
+        syscall(sys_tgkill, self_pid, tid, SIGUSR2);
     }
 
     sigaction(SIGUSR1, &threads.oldact1, nullptr);
