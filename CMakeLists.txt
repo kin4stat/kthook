@@ -3,8 +3,14 @@ project(kthook)
 
 option(KTHOOK_TEST "Compile tests" OFF)
 
+FetchContent_Declare(
+	xbyak
+	GIT_REPOSITORY https://github.com/herumi/xbyak.git
+	GIT_TAG 1c35e34abc359d14d7cba2505f2c851354298f5c
+)
+FetchContent_MakeAvailable(xbyak)
+
 add_subdirectory(ktsignal)
-add_subdirectory(xbyak)
 add_subdirectory(hde)
 
 add_library(${PROJECT_NAME} INTERFACE)
