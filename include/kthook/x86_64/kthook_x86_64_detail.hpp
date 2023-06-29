@@ -663,11 +663,50 @@ inline bool check_is_executable(const void* addr) {
 #endif
 }
 
+
 enum class MemoryProt {
     PROTECT_RW,
     PROTECT_RWE,
     PROTECT_RE,
 };
+
+inline MemoryProt get_memory_prot(const void* addr) {
+#ifdef _WIN32
+    MEMORY_BASIC_INFORMATION buffer;
+    VirtualQuery(addr, &buffer, sizeof(buffer));
+    if (buffer.Protect == PAGE_EXECUTE_READ) {
+        return MemoryProt::PROTECT_RE;
+    }
+    if (buffer.Protect == PAGE_EXECUTE_READWRITE) {
+        return MemoryProt::PROTECT_RWE;
+    }
+    if (buffer.Protect == PAGE_READWRITE) {
+        return MemoryProt::PROTECT_RW;
+    }
+    return MemoryProt::PROTECT_RE;
+#else
+
+    auto map_infos = parse_proc_maps();
+
+    std::uintptr_t iaddr = reinterpret_cast<std::uintptr_t>(addr);
+
+    for (auto& mi : map_infos) {
+        if (mi.start <= iaddr && iaddr < mi.end) {
+            if ((mi.prot & PROT_EXEC) && (mi.prot & PROT_READ)) {
+                return MemoryProt::PROTECT_RE;
+            }
+            if ((mi.prot & PROT_EXEC) && (mi.prot & PROT_READ) && (mi.prot & PROT_WRITE)) {
+                return MemoryProt::PROTECT_RWE;
+            }
+            if ((mi.prot & PROT_WRITE) && (mi.prot & PROT_READ)) {
+                return MemoryProt::PROTECT_RW;
+            }
+        }
+    }
+
+    return MemoryProt::PROTECT_RE;
+#endif
+}
 
 inline bool set_memory_prot(const void* addr, std::size_t size, MemoryProt protectMode) {
 #if defined(_WIN32)

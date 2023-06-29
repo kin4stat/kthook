@@ -477,8 +477,9 @@ private:
                     if (!detail::freeze_threads(threads))
                         return false;
 
+                auto old_prot = detail::get_memory_prot(reinterpret_cast<void*>(info.hook_address));
                 if (!set_memory_prot(reinterpret_cast<void*>(info.hook_address), this->hook_size,
-                                     detail::MemoryProt::PROTECT_RWE))
+                                     detail::MemoryProt::PROTECT_RW))
                     return false;
                 info.original_code = std::make_unique<unsigned char[]>(this->hook_size);
                 std::memcpy(info.original_code.get(), reinterpret_cast<void*>(info.hook_address), this->hook_size);
@@ -493,7 +494,7 @@ private:
                 memset(reinterpret_cast<void*>(info.hook_address + sizeof(patch)), 0x90,
                        this->hook_size - sizeof(patch));
                 if (!detail::set_memory_prot(reinterpret_cast<void*>(info.hook_address), this->hook_size,
-                                             detail::MemoryProt::PROTECT_RE))
+                                             old_prot))
                     return false;
 
                 if constexpr (freeze_threads)
@@ -787,8 +788,9 @@ private:
                     if (!detail::freeze_threads(threads))
                         return false;
 
+                auto old_prot = detail::get_memory_prot(reinterpret_cast<void*>(info.hook_address));
                 if (!set_memory_prot(reinterpret_cast<void*>(info.hook_address), this->hook_size,
-                                     detail::MemoryProt::PROTECT_RWE))
+                                     detail::MemoryProt::PROTECT_RW))
                     return false;
                 info.original_code = std::make_unique<unsigned char[]>(this->hook_size);
                 std::memcpy(info.original_code.get(), reinterpret_cast<void*>(info.hook_address), this->hook_size);
@@ -803,7 +805,7 @@ private:
                 memset(reinterpret_cast<void*>(info.hook_address + sizeof(patch)), 0x90,
                        this->hook_size - sizeof(patch));
                 if (!detail::set_memory_prot(reinterpret_cast<void*>(info.hook_address), this->hook_size,
-                                             detail::MemoryProt::PROTECT_RE))
+                                             old_prot))
                     return false;
 
                 if constexpr (freeze_threads)
@@ -1037,8 +1039,9 @@ private:
                 if (!detail::freeze_threads(threads))
                     return false;
 
+                auto old_prot = detail::get_memory_prot(reinterpret_cast<void*>(info.hook_address));
                 if (!set_memory_prot(reinterpret_cast<void*>(info.hook_address), this->hook_size,
-                                     detail::MemoryProt::PROTECT_RWE))
+                                     detail::MemoryProt::PROTECT_RW))
                     return false;
                 info.original_code = std::make_unique<unsigned char[]>(this->hook_size);
                 std::memcpy(info.original_code.get(), reinterpret_cast<void*>(info.hook_address), this->hook_size);
@@ -1053,7 +1056,7 @@ private:
                 memset(reinterpret_cast<void*>(info.hook_address + sizeof(patch)), 0x90,
                        this->hook_size - sizeof(patch));
                 if (!detail::set_memory_prot(reinterpret_cast<void*>(info.hook_address), this->hook_size,
-                                             detail::MemoryProt::PROTECT_RE))
+                                             old_prot))
                     return false;
 
                 if (!detail::unfreeze_threads(threads))
