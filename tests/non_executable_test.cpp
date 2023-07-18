@@ -10,10 +10,12 @@ TEST(kthook_simple, null_func) {
     EXPECT_FALSE(hook.install());
 }
 
+#ifdef KTHOOK_USE_SIGNALS
 TEST(kthook_signal, null_func) {
     kthook::kthook_signal<test_signature> hook{null_mem};
     EXPECT_FALSE(hook.install());
 }
+#endif
 
 TEST(kthook_naked, null_func) {
     kthook::kthook_naked hook{null_mem};

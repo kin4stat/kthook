@@ -70,6 +70,7 @@ struct tuple_cat<T, std::tuple<Ts...>> {
 template <typename T, typename... Ts>
 using tuple_cat_t = typename tuple_cat<T, Ts...>::type;
 
+#ifdef KTHOOK_USE_SIGNALS
 template <class HookT, class T, typename Tuple, typename Enable = void>
 struct on_after_type;
 
@@ -100,6 +101,7 @@ template <typename HookType, typename Ret, typename Args>
 using on_before_t = typename on_before_type<HookType, Ret, Args>::type;
 template <typename HookType, typename Ret, typename Args>
 using on_after_t = typename on_after_type<HookType, Ret, Args>::type;
+#endif
 
 template <typename Ret, typename... Args>
 struct ft {
@@ -464,6 +466,7 @@ struct JCC_REL {
 };
 #pragma pack(pop)
 
+#ifdef KTHOOK_USE_SIGNALS
 template <typename HookPtrType, typename Ret, typename... Args>
 inline Ret signal_relay(HookPtrType* this_hook, Args&... args) {
     if constexpr (std::is_void_v<Ret>) {
@@ -495,6 +498,7 @@ inline Ret signal_relay(HookPtrType* this_hook, Args&... args) {
         return value.value();
     }
 }
+#endif
 
 template <typename CallbackT, typename HookPtrType, typename Ret, typename... Args>
 inline Ret common_relay(CallbackT& cb, HookPtrType* this_hook, Args&... args) {

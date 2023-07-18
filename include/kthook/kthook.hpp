@@ -18,7 +18,10 @@
 #include "xbyak/xbyak.h"
 #endif
 
+#if __has_include("ktsignal/ktsignal.hpp")
 #include "ktsignal/ktsignal.hpp"
+#define KTHOOK_USE_SIGNALS
+#endif
 
 #ifdef _WIN32
 #ifndef WIN32_LEAN_AND_MEAN
