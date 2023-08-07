@@ -834,7 +834,7 @@ inline bool unfreeze_threads(frozen_threads& threads) {
 
 inline struct JumpAllocator : Xbyak::Allocator {
     uint8_t* alloc(size_t size) override {
-        void* ptr = Xbyak::AlignedMalloc(size, Xbyak::inner::ALIGN_PAGE_SIZE);
+        void* ptr = Xbyak::AlignedMalloc(size, Xbyak::inner::getPageSize());
         set_memory_prot(ptr, size, MemoryProt::PROTECT_RWE);
         return reinterpret_cast<uint8_t*>(ptr);
     }
@@ -847,7 +847,7 @@ inline struct JumpAllocator : Xbyak::Allocator {
 
 inline struct TrampolineAllocator : Xbyak::Allocator {
     uint8_t* alloc(size_t size) override {
-        void* ptr = Xbyak::AlignedMalloc(size, Xbyak::inner::ALIGN_PAGE_SIZE);
+        void* ptr = Xbyak::AlignedMalloc(size, Xbyak::inner::getPageSize());
         set_memory_prot(ptr, size, MemoryProt::PROTECT_RWE);
         return reinterpret_cast<uint8_t*>(ptr);
     }
