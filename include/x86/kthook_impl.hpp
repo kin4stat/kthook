@@ -391,6 +391,7 @@ private:
             }
             jump_gen->push(reinterpret_cast<std::uintptr_t>(this));
         }
+jump_gen->fsave()
 #else
         jump_gen->pop(eax);
         // if Ret is class or union, memory for return value as first argument(hidden)
@@ -654,6 +655,7 @@ private:
         }();
         constexpr bool is_thiscall = (function::convention == detail::traits::cconv::cthiscall);
         constexpr bool is_fastcall = (function::convention == detail::traits::cconv::cfastcall);
+      
 #ifdef _WIN32
         jump_gen->pop(eax);
         if constexpr (!std::is_void_v<Ret>) {

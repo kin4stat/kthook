@@ -1,0 +1,6 @@
+#ifndef KTHOOK_CCONV_DECL_HPP_
+#define KTHOOK_CCONV_DECL_HPP_
+
+
+
+#endif // #ifndef KTHOOK_CCONV_DECL_HPP_

@@ -335,20 +335,15 @@ struct take_impl : take<std::tuple_size_v<Tuple>> {
     }
 };
 
-template <bool is_take, typename T>
-struct get_size {
-    static constexpr auto value = 1;
-};
+template<typename T, bool is_take = is_take<T>::value>
+constexpr std::size_t get_size_v = 1;
 
-template <typename T>
-struct get_size<true, T> {
-    static constexpr auto value = T::size;
-};
+template<typename T>
+constexpr std::size_t get_size_v<T, true> = std::decay_t<T>::size;
 
 template <typename Output, std::size_t Start, std::size_t... Is>
 constexpr std::size_t count_idx_impl(std::index_sequence<Is...>) {
-    return (get_size<is_take<std::tuple_element_t<Is, Output>>::value, std::remove_reference_t<std::tuple_element_t<
-                         Is, Output>>>::value + ... + 0);
+    return (get_size_v<std::tuple_element_t<Is, Output>> + ... + 0);
 }
 
 template <typename Output, std::size_t Start>

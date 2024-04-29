@@ -1,0 +1,6 @@
+#ifndef KTHOOK_ARCH_MAKE_TRAMPOLINE_HPP_
+#define KTHOOK_ARCH_MAKE_TRAMPOLINE_HPP_
+
+#include "x32/make_trampoline.hpp"
+
+#endif // KTHOOK_ARCH_MAKE_TRAMPOLINE_HPP_

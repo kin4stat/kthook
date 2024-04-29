@@ -1,0 +1,6 @@
+#ifndef KTHOOK_ARCH_KTHOOK_IMPL_HPP_
+#define KTHOOK_ARCH_KTHOOK_IMPL_HPP_
+
+#include "x32/kthook_impl.hpp"
+
+#endif // KTHOOK_ARCH_FUNCTION_TRAITS_HPP_
