@@ -10,7 +10,12 @@ FetchContent_Declare(
 	GIT_REPOSITORY https://github.com/herumi/xbyak.git
 	GIT_TAG 1c35e34abc359d14d7cba2505f2c851354298f5c
 )
-FetchContent_MakeAvailable(xbyak)
+FetchContent_Declare(
+	ktsignal
+	GIT_REPOSITORY https://github.com/kin4stat/ktsignal.git
+	GIT_TAG f08a19d9a00ad5284871bf44178d835da7b26ebf
+)
+FetchContent_MakeAvailable(xbyak ktsignal)
 
 add_subdirectory(hde)
 
