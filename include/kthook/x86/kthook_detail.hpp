@@ -142,7 +142,12 @@ template <typename Ret>
 constexpr bool is_return_value_needs_stack() {
     if constexpr (std::is_void_v<Ret>) return false;
 
+#if (defined(__cplusplus) && __cplusplus > 202302L) || (defined(_MSVC_LANG) && _MSVC_LANG > 202302L)
+    return (!(std::is_trivially_copyable_v<Ret> && std::is_trivially_default_constructible_v<Ret>
+              && std::is_standard_layout_v<Ret> && sizeof(Ret) <= 8));
+#else
     return (!(std::is_trivial_v<Ret> && std::is_standard_layout_v<Ret> && sizeof(Ret) <= 8));
+#endif
 }
 
 template <typename HookPtrType, traits::cconv Convention, typename Ret, typename... Args>
