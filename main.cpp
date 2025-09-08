@@ -1,4 +1,5 @@
 #include "kthook/kthook.hpp"
+#include <iostream>
 
 #if defined(_MSC_VER)
 #define NO_OPTIMIZE __declspec(noinline)
@@ -29,7 +30,7 @@ void foo(int, float, double) {
 }
 
 int main() {
-  kthook::hook<decltype(&foo)> hook;
+  kthook::hook_safe<decltype(&foo)> hook;
   hook.set_dest(static_cast<void*>(&foo));
   hook.set_callback_wrapped(kthook::keep<1> +
                             [](kthook::interface auto& interface, int i) {

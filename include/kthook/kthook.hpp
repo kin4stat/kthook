@@ -93,8 +93,13 @@
 #include "arch/hook_interface.hpp"
 #include "interface.hpp"
 
-#include "arch/kthook_impl.hpp"
+//#include "arch/kthook_impl.hpp"
 
 #include "concepts/concepts.hpp"
+
+#include "impl/inline_x86_32_impl_base.hpp"
+#include "impl/inline_x86_32_impl_safe.hpp"
+#include "impl/inline_x86_32_impl_unsafe.hpp"
+#include "impl/hook_impl.hpp"
 
 #endif // KTHOOK_HPP_

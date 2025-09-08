@@ -2,21 +2,21 @@
 #define KTHOOK_ARCH_X86_KTHOOK_IMPL_HPP_
 
 namespace kthook {
-template <typename FuncSig, template<typename> typename Traits>
+template <template<typename, typename> typename Impl, typename FuncSig, template<typename> typename Traits>
 class hook
-    : public Traits<FuncSig>,
+    : public Impl<FuncSig, Traits<FuncSig>>,
+      public Traits<FuncSig>,
       public utils::dependent_stack_holder<Traits<FuncSig>::allow_recursive_calls,
                                            arch::detail::ctx_storage<Traits<FuncSig>>> {
 public:
+  using HookImpl = Impl<FuncSig, Traits<FuncSig>>;
   using HookTraits = Traits<FuncSig>;
   using FunctionSignature = FuncSig;
 
   /**
    * Default constructor, initializes hook to nullptr
    */
-  hook()
-    : info(0, nullptr) {
-    alloc_ctx_storage();
+  hook() : HookImpl(typename HookImpl::default_args{}) {
   }
 
   /**
@@ -24,31 +24,10 @@ public:
    * @param destination address where to set hook
    * @param force_enable enable hook right after construction
    */
-  hook(std::uintptr_t destination, bool force_enable = false)
-    : info(destination, nullptr) {
-    alloc_ctx_storage();
+  hook(typename HookImpl::args args, bool force_enable) : base(args) {
     if (force_enable) {
       install();
     }
-  }
-
-  /**
-   * 
-   * @param destination address where to set hook
-   * @param force_enable enable hook right after construction
-   */
-  hook(void* destination, bool force_enable = false)
-    : hook(reinterpret_cast<std::uintptr_t>(destination), force_enable) {
-  }
-
-  /**
-   * 
-   * @param destination address where to set hook
-   * @param force_enable enable hook right after construction
-   */
-  template <typename Ptr>
-  hook(Ptr* destination, bool force_enable = false)
-    : hook(reinterpret_cast<void*>(destination), force_enable) {
   }
 
   ~hook() {

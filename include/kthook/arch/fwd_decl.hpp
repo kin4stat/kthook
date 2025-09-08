@@ -92,8 +92,14 @@ private:
 template <typename FuncSig>
 struct hook_traits;
 
-template <typename FuncSig, template<typename> typename Traits = hook_traits>
+template <typename FuncSig, template<typename, typename> typename Impl, template<typename> typename Traits = hook_traits>
 class hook;
+
+//template <typename FuncSig, template<typename> typename Traits>
+//struct win_x86_32_inline_impl_unsafe;
+//
+//template <typename FuncSig, template<typename> typename Traits>
+//struct win_x86_32_inline_impl_safe;
 
 template <typename FuncSig, template<typename U> typename Traits = hook_traits, typename Discarded = void, typename
           Range = traits::range<>>

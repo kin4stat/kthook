@@ -571,7 +571,7 @@ struct ctx_storage
   ctx_storage& operator=(ctx_storage&& other) noexcept = default;
   ~ctx_storage() = default;
 
-  template <typename FuncSig, template<typename> typename Traits>
+  template <typename FuncSig, template<typename, typename> typename Impl, template<typename> typename Traits>
   friend class hook;
 
   template<typename T, typename StorageT>
