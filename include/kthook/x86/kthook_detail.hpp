@@ -24,6 +24,23 @@ enum class cconv {
     cstdcall,
 };
 
+#if defined(__clang__)
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wattributes"
+#elif defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wattributes"
+#endif // defined(__GNUC__)
+
+template <typename Ret, typename... Args>
+using thiscall_t = Ret(CTHISCALL*)(Args ...);
+
+#if defined(__clang__)
+#pragma clang diagnostic pop
+#elif defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif // defined(__GNUC__)
+
 template <cconv Conv, typename Ret, typename Tuple>
 struct function_connect_ptr;
 
@@ -39,7 +56,7 @@ struct function_connect_ptr<cconv::cstdcall, Ret, std::tuple<Args...>> {
 
 template <typename Ret, typename... Args>
 struct function_connect_ptr<cconv::cthiscall, Ret, std::tuple<Args...>> {
-    using type = Ret(CTHISCALL*)(Args ...);
+    using type = thiscall_t<Ret, Args...>;
 };
 
 template <typename Ret, typename... Args>
@@ -87,7 +104,7 @@ struct function_traits<Ret(Args ...)> {
 };
 
 template <typename Ret, typename... Args>
-struct function_traits<Ret(CTHISCALL *)(Args ...)> {
+struct function_traits<thiscall_t<Ret, Args ...>> {
     static constexpr auto args_count = sizeof...(Args);
     static constexpr auto convention = cconv::cthiscall;
     using args = std::tuple<Args...>;
