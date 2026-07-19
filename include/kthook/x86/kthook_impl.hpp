@@ -84,7 +84,6 @@ inline bool create_trampoline(std::uintptr_t hook_address,
         0x00000000  // Relative destination address
     };
 
-    std::size_t trampoline_size = 0;
     void* op_copy_src = nullptr;
     std::uintptr_t current_address = hook_address;
     std::uintptr_t max_jmp_ref = 0;
@@ -165,7 +164,6 @@ inline bool create_trampoline(std::uintptr_t hook_address,
 
         trampoline_gen->db(reinterpret_cast<std::uint8_t*>(op_copy_src), op_copy_size);
 
-        trampoline_size += op_copy_size;
         current_address += hs.len;
     }
     if (current_address - hook_address < sizeof(JMP_REL)) return false;
