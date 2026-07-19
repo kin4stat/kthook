@@ -91,8 +91,6 @@ inline bool create_trampoline(std::uintptr_t hook_address,
         0x00000000  // Relative destination address
     };
 
-    std::size_t trampoline_size = 0;
-    std::size_t op_copy_size = 0;
     void* op_copy_src = nullptr;
     std::uintptr_t current_address = hook_address;
     std::uintptr_t max_jmp_ref = 0;
@@ -173,7 +171,6 @@ inline bool create_trampoline(std::uintptr_t hook_address,
 
         trampoline_gen->db(reinterpret_cast<std::uint8_t*>(op_copy_src), op_copy_size);
 
-        trampoline_size += op_copy_size;
         current_address += hs.len;
     }
     if (current_address - hook_address < sizeof(JMP_REL)) return false;
@@ -473,7 +470,12 @@ private:
 #ifdef _WIN32
         jump_gen->pop(eax);
         if constexpr (!std::is_void_v<Ret>) {
+#if (defined(__cplusplus) && __cplusplus > 202302L) || (defined(_MSVC_LANG) && _MSVC_LANG > 202302L)
+            constexpr bool is_fully_nontrivial = !(std::is_trivially_copyable_v<Ret> && std::is_trivially_default_constructible_v<Ret>)
+                                                 || !std::is_trivially_destructible_v<Ret>;
+#else
             constexpr bool is_fully_nontrivial = !std::is_trivial_v<Ret> || !std::is_trivially_destructible_v<Ret>;
+#endif
             if constexpr (sizeof(Ret) > 8 || is_fully_nontrivial) {
                 if constexpr ((is_thiscall || is_fastcall) && (sizeof(Ret) % 2 != 0 || is_fully_nontrivial)) {
                     jump_gen->push(reinterpret_cast<std::uintptr_t>(this));
@@ -506,7 +508,12 @@ private:
         // if Ret is class or union, memory for return value as first argument(hidden)
         // so we need to push our hook pointer after this hidden argument
         if constexpr (!std::is_void_v<Ret>) {
+#if (defined(__cplusplus) && __cplusplus > 202302L) || (defined(_MSVC_LANG) && _MSVC_LANG > 202302L)
+            constexpr bool is_fully_nontrivial = !(std::is_trivially_copyable_v<Ret> && std::is_trivially_default_constructible_v<Ret>)
+                                                 || !std::is_trivially_destructible_v<Ret>;
+#else
             constexpr bool is_fully_nontrivial = !std::is_trivial_v<Ret> || !std::is_trivially_destructible_v<Ret>;
+#endif
             if constexpr (std::is_class_v<Ret> || std::is_union_v<Ret> || sizeof(Ret) > 8) {
                 if constexpr (is_thiscall && (sizeof(Ret) % 2 != 0 || is_fully_nontrivial)) {
                     jump_gen->push(reinterpret_cast<std::uintptr_t>(this));
@@ -767,7 +774,12 @@ private:
 #ifdef _WIN32
         jump_gen->pop(eax);
         if constexpr (!std::is_void_v<Ret>) {
+#if (defined(__cplusplus) && __cplusplus > 202302L) || (defined(_MSVC_LANG) && _MSVC_LANG > 202302L)
+            constexpr bool is_fully_nontrivial = !(std::is_trivially_copyable_v<Ret> && std::is_trivially_default_constructible_v<Ret>)
+                                                 || !std::is_trivially_destructible_v<Ret>;
+#else
             constexpr bool is_fully_nontrivial = !std::is_trivial_v<Ret> || !std::is_trivially_destructible_v<Ret>;
+#endif
             if constexpr (sizeof(Ret) > 8 || is_fully_nontrivial) {
                 if constexpr ((is_thiscall || is_fastcall) && (sizeof(Ret) % 2 != 0 || is_fully_nontrivial)) {
                     jump_gen->push(reinterpret_cast<std::uintptr_t>(this));

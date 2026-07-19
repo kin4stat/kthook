@@ -416,7 +416,7 @@ constexpr decltype(auto) unpack_impl(Output& output) {
 }
 
 template <typename Input, typename Output, std::size_t... Is>
-constexpr decltype(auto) unpack(Output output, std::index_sequence<Is...>) {
+constexpr decltype(auto) unpack([[maybe_unused]] Output output, std::index_sequence<Is...>) {
     return std::tuple_cat(unpack_impl<Input, Is>(output)...);
 }
 
@@ -839,7 +839,7 @@ inline struct JumpAllocator : Xbyak::Allocator {
         return reinterpret_cast<uint8_t*>(ptr);
     }
 
-    void free(uint8_t* p) override {
+    void free(uint8_t*) override {
     }
 
     bool useProtect() const override { return false; }
